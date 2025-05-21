@@ -6,8 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		0DDDE95A2DDD722A007BF1F7 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0D0B789D2DDD71BB00D754F7 /* WebKit.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		0D0B78892DDD705000D754F7 /* Overly.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Overly.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0D0B789D2DDD71BB00D754F7 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -23,6 +28,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0DDDE95A2DDD722A007BF1F7 /* WebKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -33,6 +39,7 @@
 			isa = PBXGroup;
 			children = (
 				0D0B788B2DDD705000D754F7 /* Overly */,
+				0D0B789C2DDD71BB00D754F7 /* Frameworks */,
 				0D0B788A2DDD705000D754F7 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -43,6 +50,14 @@
 				0D0B78892DDD705000D754F7 /* Overly.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		0D0B789C2DDD71BB00D754F7 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				0D0B789D2DDD71BB00D754F7 /* WebKit.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
