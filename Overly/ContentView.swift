@@ -23,8 +23,36 @@ struct CustomTitleBar: View {
         .frame(height: 30) // Set a fixed height for the title bar
         .background(.thinMaterial) // Set the background material
         .gesture(TapGesture(count: 2).onEnded({
-            // Handle double-click to zoom
-            window?.zoom(nil)
+            // Handle double-click to maximize/restore the window with animation
+            if let window = window {
+                let screenFrame = NSScreen.main?.visibleFrame ?? NSScreen.main?.frame ?? .zero
+                let windowFrame = window.frame
+
+                // Check if the window is already maximized (or close to it)
+                let isMaximized = windowFrame.size.width >= screenFrame.size.width * 0.95 && windowFrame.size.height >= screenFrame.size.height * 0.95
+
+                let targetFrame: NSRect
+
+                if isMaximized {
+                    // Define the frame to restore the window to
+                    let initialWidth: CGFloat = 600
+                    let initialHeight: CGFloat = 500
+                    let newOriginX = screenFrame.midX - initialWidth / 2
+                    let newOriginY = screenFrame.midY - initialHeight / 2
+                    targetFrame = NSRect(x: newOriginX, y: newOriginY, width: initialWidth, height: initialHeight)
+                } else {
+                    // Define the frame to maximize the window to
+                    targetFrame = screenFrame
+                }
+
+                // Animate the frame change
+                NSAnimationContext.runAnimationGroup({
+                    context in
+                    context.duration = 0.3 // Animation duration in seconds
+                    context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                    window.animator().setFrame(targetFrame, display: true)
+                }, completionHandler: nil)
+            }
         }))
     }
 }

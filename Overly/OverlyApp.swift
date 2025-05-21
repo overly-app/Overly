@@ -10,7 +10,7 @@ import AppKit
 import Combine
 import HotKey
 
-// Custom NSVisualEffectView subclass to handle masking for rounded top corners
+// Custom NSVisualEffectView subclass to handle masking for rounded corners
 class MaskedVisualEffectView: NSVisualEffectView {
     override func layout() {
         super.layout()
@@ -21,17 +21,17 @@ class MaskedVisualEffectView: NSVisualEffectView {
     func applyCustomShapeMask() {
         let layer = CAShapeLayer()
         let bounds = self.bounds
-        let cornerRadius: CGFloat = 10.0 // Define the corner radius
+        let cornerRadius: CGFloat = 12.0 // Define the corner radius to match macOS default
 
-        // Create a path with rounded top corners and straight bottom edges
+        // Create a path with rounded corners for all corners
         let path = NSBezierPath(roundedRect: bounds, xRadius: cornerRadius, yRadius: cornerRadius)
-
-        // Create a rectangle that covers the bottom corners to make them square
-        let squareBottom = NSRect(x: bounds.minX, y: bounds.minY, width: bounds.width, height: cornerRadius)
-        path.append(NSBezierPath(rect: squareBottom))
-
+        
         layer.path = path.cgPath // Set the path
         self.layer?.mask = layer // Apply the mask to the view's layer
+        
+        // Configure the layer for proper border handling
+        self.layer?.cornerRadius = cornerRadius
+        self.layer?.masksToBounds = true
     }
 
     // Ensure the mask is updated when the view's bounds change
@@ -50,7 +50,9 @@ class BorderlessWindow: NSWindow {
         backing: NSWindow.BackingStoreType,
         defer flag: Bool
     ) {
-        super.init(contentRect: contentRect, styleMask: styleMask, backing: backing, defer: flag)
+        // Add .resizable back to the style mask
+        let modifiedStyleMask: NSWindow.StyleMask = [.borderless, .resizable]
+        super.init(contentRect: contentRect, styleMask: modifiedStyleMask, backing: backing, defer: flag)
 
         // Configure the window for a custom shape and no title bar
         self.titlebarAppearsTransparent = true
@@ -58,31 +60,58 @@ class BorderlessWindow: NSWindow {
         self.isOpaque = false
         self.backgroundColor = .clear
         self.isMovableByWindowBackground = true
-
+        self.hasShadow = false // Ensure no native shadow
+        
+        // Set window appearance to match system
+        self.appearance = NSAppearance(named: .vibrantDark)
+        
         // Set a custom content view that will handle the shape and background
         let customContentView = MaskedVisualEffectView(frame: contentRect)
-        customContentView.material = .contentBackground // Using .contentBackground material
+        // Use .HUDWindow for a thin, translucent material
+        customContentView.material = .hudWindow
         customContentView.blendingMode = .behindWindow
         customContentView.state = .active
-        customContentView.wantsLayer = true // Enable layers for masking
-
+        customContentView.wantsLayer = true
+        
+        // Ensure the window and content view have the same corner radius
+        let cornerRadius: CGFloat = 12.0
         self.contentView = customContentView
-
-        // The mask is applied and updated in MaskedVisualEffectView's layout() and bounds.didSet
-
-        // Update the window's shadow based on the new shape
-        // This might need to be triggered after the content view's layout
-        DispatchQueue.main.async { // Ensure layout has potentially happened
-             self.invalidateShadow()
+        
+        // Configure the window for rounded corners without borders
+        DispatchQueue.main.async {
+            if let contentView = self.contentView {
+                contentView.wantsLayer = true
+                contentView.layer?.cornerRadius = cornerRadius
+                contentView.layer?.masksToBounds = true
+                contentView.layer?.borderWidth = 0
+                contentView.layer?.backgroundColor = .clear
+            }
+             // The window's own layer should also be configured
+             self.contentView?.window?.contentView?.wantsLayer = true
+             self.contentView?.window?.contentView?.layer?.cornerRadius = cornerRadius
+             self.contentView?.window?.contentView?.layer?.masksToBounds = true
+             self.contentView?.window?.contentView?.layer?.borderWidth = 0
+             self.contentView?.window?.contentView?.layer?.backgroundColor = .clear
+            
         }
     }
 
-    // Required initializer
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-
-    // Removed incorrect resize and setFrame overrides
+    
+    override func setFrame(_ frameRect: NSRect, display flag: Bool) {
+        super.setFrame(frameRect, display: flag)
+        if let contentView = self.contentView {
+            let cornerRadius: CGFloat = 12.0
+            contentView.layer?.cornerRadius = cornerRadius
+            contentView.layer?.borderWidth = 0
+            
+            // Also apply to the window's content view during resize
+            contentView.window?.contentView?.layer?.cornerRadius = cornerRadius
+            contentView.window?.contentView?.layer?.borderWidth = 0
+        }
+    }
 }
 
 // Class to manage the window and hotkey
@@ -107,8 +136,8 @@ class WindowManager: NSObject {
             print("customWindow is nil, creating new window.")
             // If the window hasn't been created yet, create it
             let newWindow = BorderlessWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 600, height: 500), // Initial size
-                styleMask: [.borderless, .resizable], // No title bar or traffic lights + resizable
+                contentRect: NSRect(x: 0, y: 0, width: 600, height: 500),
+                styleMask: [.borderless, .resizable, .fullSizeContentView],
                 backing: .buffered,
                 defer: false
             )
