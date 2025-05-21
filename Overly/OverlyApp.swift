@@ -133,11 +133,20 @@ class BorderlessWindow: NSWindow {
 }
 
 // Class to manage the window and hotkey
-class WindowManager: NSObject {
+class WindowManager: NSObject, ObservableObject {
     private var customWindow: BorderlessWindow? // Use BorderlessWindow type
     private var hotKey: HotKey?
     private var reloadHotKey: HotKey?
     private var nextServiceHotKey: HotKey?
+    
+    // Add a state variable to track the current view
+    @Published public var currentView: CurrentViewState = .webView
+    
+    // Define an enum for the possible view states
+    public enum CurrentViewState {
+        case webView
+        case settingsView
+    }
     
     // Closures to trigger actions on the visible ContentView
     // These closures will be set by the visible ContentView instance
@@ -192,9 +201,23 @@ class WindowManager: NSObject {
 
             // Create an NSHostingView to wrap the SwiftUI ContentView
             // ContentView will set the actions on the window in its onAppear
-             let contentView = ContentView(window: newWindow)
-             let hostingView = NSHostingView(rootView: AnyView(contentView)) // Wrap in AnyView
-             newWindow.contentView = hostingView // Set directly as content view
+            // Set the ContentView as the root view of the HostingView once
+            let contentView = ContentView(window: newWindow, windowManager: self) // Pass windowManager
+            let hostingView = NSHostingView(rootView: AnyView(contentView)) // Wrap in AnyView
+            // Set the HostingView as the contentView of the MaskedVisualEffectView
+            if let maskedContentView = newWindow.contentView as? MaskedVisualEffectView {
+                 maskedContentView.addSubview(hostingView)
+                 // Set constraints to make hostingView fill the maskedContentView
+                 hostingView.translatesAutoresizingMaskIntoConstraints = false
+                 NSLayoutConstraint.activate([
+                     hostingView.topAnchor.constraint(equalTo: maskedContentView.topAnchor),
+                     hostingView.bottomAnchor.constraint(equalTo: maskedContentView.bottomAnchor),
+                     hostingView.leadingAnchor.constraint(equalTo: maskedContentView.leadingAnchor),
+                     hostingView.trailingAnchor.constraint(equalTo: maskedContentView.trailingAnchor)
+                 ])
+             } else { // Fallback if contentView is not MaskedVisualEffectView
+                 newWindow.contentView = hostingView // Set directly if necessary
+             }
 
             // Store the window in the class property
             customWindow = newWindow
@@ -222,6 +245,20 @@ class WindowManager: NSObject {
                  // window.resignKey()
              }
         }
+    }
+    
+    // Add a method to show the settings view
+    func showSettingsView() {
+        print("showSettingsView called.")
+        currentView = .settingsView // Just change the state
+        // ContentView will react to this state change automatically
+    }
+    
+    // Add a method to show the web view (to switch back from settings)
+    func showWebView() {
+        print("showWebView called.")
+        currentView = .webView // Just change the state
+        // ContentView will react to this state change automatically
     }
     
     // We no longer need the perform helper methods here

@@ -12,14 +12,16 @@ enum AIService: String, CaseIterable, Identifiable {
     case chatgpt = "ChatGPT"
     case gemini = "Gemini"
     case poe = "Poe"
+    case settings = "Settings"
 
     var id: String { self.rawValue }
 
-    var url: URL {
+    var url: URL? {
         switch self {
         case .chatgpt: return URL(string: "https://chatgpt.com")!
         case .gemini: return URL(string: "https://gemini.google.com")!
         case .poe: return URL(string: "https://poe.com")!
+        case .settings: return nil
         }
     }
 
@@ -28,6 +30,7 @@ enum AIService: String, CaseIterable, Identifiable {
         case .chatgpt: return "openai" // Use the actual asset name
         case .gemini: return "gemini" // Use the actual asset name
         case .poe: return "poe" // Use the actual asset name
+        case .settings: return "gearshape"
         }
     }
 }
@@ -46,9 +49,16 @@ struct ServiceDropdownView: View {
                     dismiss()
                 }) {
                     HStack {
-                        Image(service.iconName) // Use the custom asset name
-                            .resizable()
-                            .frame(width: 20, height: 20)
+                        // Use Image(systemName:) for the settings icon, otherwise use Image(_:)
+                        if service == .settings {
+                            Image(systemName: service.iconName) // Use systemName for SF Symbols
+                                .resizable()
+                                .frame(width: 20, height: 20)
+                        } else {
+                            Image(service.iconName) // Use asset catalog for other icons
+                                .resizable()
+                                .frame(width: 20, height: 20)
+                        }
                         Text(service.rawValue)
                         Spacer()
                     }
@@ -178,19 +188,49 @@ struct CustomTitleBar: View {
 
 struct ContentView: View {
     let window: NSWindow? // Add a property to hold the window reference
+    // Add an ObservedObject property to observe the WindowManager
+    @ObservedObject var windowManager: WindowManager // Observe the window manager
+
     @State private var selectedService: AIService = .chatgpt // State to hold the selected service
 
     var body: some View {
-        VStack(spacing: 0) { // Use a VStack with no spacing
-            // Pass the binding down to CustomTitleBar
+        // Use a Group to conditionally display content
+        VStack(spacing: 0) { // Use a VStack with no spacing for the main content area
+            // Always display the custom title bar
             CustomTitleBar(window: window, selectedService: $selectedService) // Add our custom title bar at the top
-            // Pass the selected service URL down to WebView
-            WebView(url: selectedService.url)
+            
+            // Switch the main content based on the current view state
+            Group { // Use a Group to conditionally display content below the title bar
+                switch windowManager.currentView {
+                case .webView:
+                    // Display the WebView when in webView state
+                    // Safely unwrap the URL since settings case has no URL
+                    if let url = selectedService.url {
+                        WebView(url: url)
+                    } else {
+                         // This case should not happen if we are in webView state, but good practice
+                         Color.clear // Or some placeholder view
+                    }
+
+                case .settingsView:
+                    // Display the SettingsView when in settingsView state
+                    SettingsView(windowManager: windowManager) // Pass the windowManager
+                }
+            }
+            // The main VStack will inherit the padding and background from ContentView's modifiers if any are applied to ContentView itself.
+            // Or, we can apply background/padding here if needed.
+//            .background(.thinMaterial) // Example: Apply background here if not on ContentView
+//            .padding() // Example: Apply padding here if not on ContentView
         }
         // Observe changes to selectedService (triggered by dropdown) and update WebView
-        .onChange(of: selectedService) {
-            _ in
-            // WebView will automatically update due to the binding
+        .onChange(of: selectedService) { newValue in // Use newValue
+            // If the selected service is settings, switch to settings view
+            if newValue == .settings {
+                windowManager.showSettingsView()
+            } else {
+                // Otherwise, ensure we are in web view state and the web view will update due to binding
+                windowManager.showWebView()
+            }
         }
         .onAppear {
             // When the view appears, pass the actions up to the WindowManager via the window
@@ -223,5 +263,5 @@ struct ContentView: View {
 
 #Preview {
     // Provide a dummy binding and actions for preview
-    ContentView(window: nil)
+    ContentView(window: nil, windowManager: WindowManager())
 }
