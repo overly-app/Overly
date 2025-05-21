@@ -5,7 +5,7 @@ struct WebView: NSViewRepresentable {
     let url: URL
 
     func makeNSView(context: Context) -> WKWebView {
-        
+        print("WebView: makeNSView called with URL: \(url)")
         let webView = WKWebView()
         // Perform an initial load when the view is created
         let request = URLRequest(url: url)
@@ -14,7 +14,10 @@ struct WebView: NSViewRepresentable {
     }
     
     func updateNSView(_ nsView: WKWebView, context: Context) {
-        // Required by NSViewRepresentable, but no updates needed here
+        print("WebView: updateNSView called with URL: \(url)")
+        // Load the new URL when the url property changes
+        let request = URLRequest(url: url)
+        nsView.load(request)
     }
 }
 
