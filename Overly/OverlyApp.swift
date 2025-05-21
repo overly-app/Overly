@@ -7,38 +7,29 @@
 
 import SwiftUI
 import AppKit
-import Combine // Keep Combine for ObservableObject if needed elsewhere, or remove if not.
-import HotKey // Import HotKey
+import Combine
+import HotKey
 
-@main
-struct OverlyApp: App {
-    // State to manage the custom window and its visibility
-    @State private var customWindow: NSWindow?
-    @State private var shouldLoadWebView: Bool = false // State to signal web view load
+// Class to manage the window and hotkey
+class WindowManager: NSObject {
+    private var customWindow: NSWindow?
+    private var hotKey: HotKey?
 
-    // Property to hold the global hotkey
-    private var hotKey: HotKey? // Add hotKey property
-
-    init() {
+    override init() {
+        super.init()
         // Create the global hotkey for Cmd + J
         hotKey = HotKey(key: .j, modifiers: [.command])
-        hotKey?.keyDownHandler = { [self] in
+        hotKey?.keyDownHandler = { [weak self] in
             // Call the toggle window method when the hotkey is pressed
-            toggleCustomWindowVisibility()
+            self?.toggleCustomWindowVisibility()
         }
     }
 
     // Method to toggle the custom window's visibility
-    private func toggleCustomWindowVisibility() {
-         if let window = customWindow {
-            let isVisible = window.isVisible
-            window.setIsVisible(!isVisible)
-            if !isVisible { // If making the window visible
-                // Bring the app to the front and order the window when showing
-                NSApp.activate(ignoringOtherApps: true)
-                window.makeKeyAndOrderFront(nil)
-            }
-        } else {
+    func toggleCustomWindowVisibility() {
+        print("toggleCustomWindowVisibility called. customWindow is currently: \(customWindow == nil ? "nil" : "not nil")")
+        if customWindow == nil {
+            print("customWindow is nil, creating new window.")
             // If the window hasn't been created yet, create it
             let newWindow = NSWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 600, height: 500), // Initial size
@@ -53,24 +44,43 @@ struct OverlyApp: App {
             newWindow.center() // Center the window initially
 
             // Create an NSHostingView to wrap the SwiftUI ContentView
-            // Pass a binding to the state variable to ContentView
-            let hostingView = NSHostingView(rootView: ContentView(shouldLoad: $shouldLoadWebView))
+            let hostingView = NSHostingView(rootView: ContentView())
             newWindow.contentView = hostingView // Set the SwiftUI view as the window's content
 
-            newWindow.setIsVisible(true) // Show the new window
-
-            // Bring the app to the front and order the window when showing
-            NSApp.activate(ignoringOtherApps: true)
-            newWindow.makeKeyAndOrderFront(nil)
-
-            // Store the window in the state variable
+            // Store the window in the class property
             customWindow = newWindow
         }
+
+        // Now that we are sure customWindow is not nil, toggle its visibility
+        if let window = customWindow {
+            let isVisible = window.isVisible
+            print("customWindow is not nil. Current visibility: \(isVisible).")
+            window.setIsVisible(!isVisible)
+
+            // Always attempt to make it key and order front when showing
+            if !isVisible { // If the window *was* hidden and is now visible
+                print("Window was hidden, making visible and ordering front.")
+                NSApp.activate(ignoringOtherApps: true)
+                window.makeKeyAndOrderFront(nil)
+            }
+             else { // If the window *was* visible and is now hidden
+                 print("Window was visible, hiding.")
+                 // Optionally, you might want to resign key window status when hiding
+                 // window.resignKey()
+             }
+        }
     }
+}
+
+@main
+struct OverlyApp: App {
+    // Keep a reference to the WindowManager instance
+    // Use @NSApplicationDelegateAdaptor to manage the lifecycle of the manager
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate // We might need a simple App Delegate to hold the WindowManager
 
     var body: some Scene {
         // A minimal WindowGroup just to satisfy macOS app structure requirements.
-        // The main UI is in the custom borderless window managed by this App struct.
+        // The main UI is in the custom borderless window managed by the WindowManager.
 //         WindowGroup {
 //           // This content is not intended to be the primary visible UI.
 //           // We can leave it minimal or empty.
@@ -87,4 +97,16 @@ struct OverlyApp: App {
             }
         }
     }
+}
+
+// A simple App Delegate to hold and manage the WindowManager
+class AppDelegate: NSObject, NSApplicationDelegate {
+    var windowManager: WindowManager? // Use optional to allow lazy initialization
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Initialize the WindowManager when the application finishes launching
+        windowManager = WindowManager()
+    }
+
+    // Other optional NSApplicationDelegate methods can be added here if needed
 }

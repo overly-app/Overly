@@ -24,18 +24,16 @@ struct CustomTitleBar: View {
 }
 
 struct ContentView: View {
-    @Binding var shouldLoad: Bool // Accept the binding from OverlyApp
-
     var body: some View {
         VStack(spacing: 0) { // Use a VStack with no spacing
             CustomTitleBar() // Add our custom title bar at the top
             // Pass the binding down to WebView
-            WebView(url: URL(string: "https://chatgpt.com")!, shouldLoad: $shouldLoad)
+            WebView(url: URL(string: "https://chatgpt.com")!)
         }
     }
 }
 
 #Preview {
     // Provide a dummy binding for preview
-    ContentView(shouldLoad: .constant(false))
+    ContentView()
 }

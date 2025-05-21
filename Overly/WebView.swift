@@ -3,7 +3,6 @@ import WebKit
 
 struct WebView: NSViewRepresentable {
     let url: URL
-    @Binding var shouldLoad: Bool // Accept the binding
 
     func makeNSView(context: Context) -> WKWebView {
         
@@ -13,20 +12,10 @@ struct WebView: NSViewRepresentable {
         webView.load(request)
         return webView
     }
-
+    
     func updateNSView(_ nsView: WKWebView, context: Context) {
-        // Load the request every time the binding changes.
-        // updateNSView is called when the binding value changes.
-        let request = URLRequest(url: url)
-        nsView.load(request)
-         // The updateNSView method is called when relevant state or bindings change.
-         // We don't need explicit logic to check for changes or a previous value here,
-         // as SwiftUI manages when updateNSView is invoked based on the bindings.
-         // The load request might happen more often than strictly needed,
-         // but it ensures the content is loaded when the window is shown.
+        // Required by NSViewRepresentable, but no updates needed here
     }
-
-    // Removed incorrect body(content:) function, makeCoordinator, Coordinator, etc.
 }
 
 // Helper view to access the WKWebView instance from makeNSView
