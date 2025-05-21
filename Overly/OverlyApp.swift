@@ -271,6 +271,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowManager = WindowManager()
         
         // Removed code that was setting actions from a temporary ContentView
+        
+        // Show the window immediately on launch
+        windowManager?.toggleCustomWindowVisibility()
     }
 
     // Other optional NSApplicationDelegate methods can be added here if needed

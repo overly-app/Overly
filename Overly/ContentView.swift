@@ -190,25 +190,13 @@ struct ContentView: View {
         // Observe changes to selectedService (triggered by dropdown) and update WebView
         .onChange(of: selectedService) {
             _ in
-            print("ContentView: selectedService changed to \(selectedService.rawValue).")
             // WebView will automatically update due to the binding
         }
         .onAppear {
-            print("ContentView: onAppear called.")
             // When the view appears, pass the actions up to the WindowManager via the window
             if let window = window as? BorderlessWindow {
-                 print("ContentView: Found BorderlessWindow in onAppear.")
-                 window.reloadAction = { 
-                     print("ContentView: reloadAction closure called from hotkey.")
-                     self.reloadWebView()
-                 }
-                 window.nextServiceAction = { 
-                     print("ContentView: nextServiceAction closure called from hotkey.")
-                     self.selectNextService()
-                 }
-                 print("ContentView: reloadAction and nextServiceAction set on window.")
-             } else {
-                 print("ContentView: Could not find BorderlessWindow in onAppear.")
+                 window.reloadAction = { self.reloadWebView() }
+                 window.nextServiceAction = { self.selectNextService() }
              }
         }
     }
@@ -216,31 +204,19 @@ struct ContentView: View {
     // Function to find the next service in the enum and switch to it
     // Internal so WindowManager can call it directly
     internal func selectNextService() {
-        print("ContentView: selectNextService called.")
-        print("ContentView: Current service before switch: \(selectedService.rawValue).")
         let allCases = AIService.allCases
         if let currentIndex = allCases.firstIndex(of: selectedService) {
             let nextIndex = (currentIndex + 1) % allCases.count
-            let nextService = allCases[nextIndex]
-            selectedService = nextService
-            print("ContentView: Calculated next service: \(nextService.rawValue).")
-            print("ContentView: Switched to next service: \(selectedService.rawValue).")
-        } else {
-            print("ContentView: Could not find current service in allCases.")
+            selectedService = allCases[nextIndex]
         }
     }
     
     // Function to trigger WebView reload
     // Internal so WindowManager can call it directly
     internal func reloadWebView() {
-        print("ContentView: reloadWebView called.")
         // Find the WKWebView instance within the view hierarchy and call reload
          if let webView = window?.contentView?.findSubview(ofType: WKWebView.self) {
-             print("ContentView: Found WKWebView, calling reload.")
              webView.reload()
-             print("ContentView: reload() called.")
-         } else {
-             print("ContentView: Could not find WKWebView to reload.")
          }
     }
 }
