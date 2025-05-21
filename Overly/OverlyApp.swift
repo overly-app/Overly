@@ -62,6 +62,9 @@ class BorderlessWindow: NSWindow {
         self.isMovableByWindowBackground = true
         self.hasShadow = false // Ensure no native shadow
         
+        // Set window level to floating so it stays above other windows
+        self.level = .floating
+        
         // Set window appearance to match system
         self.appearance = NSAppearance(named: .vibrantDark)
         
