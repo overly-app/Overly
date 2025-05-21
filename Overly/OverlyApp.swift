@@ -45,6 +45,10 @@ class MaskedVisualEffectView: NSVisualEffectView {
 
 // Custom NSWindow subclass for a borderless window
 class BorderlessWindow: NSWindow {
+    // Closures to hold actions from ContentView
+    var reloadAction: (() -> Void)?
+    var nextServiceAction: (() -> Void)?
+
     override init(
         contentRect: NSRect,
         styleMask: NSWindow.StyleMask,
@@ -113,6 +117,7 @@ class BorderlessWindow: NSWindow {
         fatalError("init(coder:) has not been implemented")
     }
     
+    
     override func setFrame(_ frameRect: NSRect, display flag: Bool) {
         super.setFrame(frameRect, display: flag)
         if let contentView = self.contentView {
@@ -129,15 +134,16 @@ class BorderlessWindow: NSWindow {
 
 // Class to manage the window and hotkey
 class WindowManager: NSObject {
-    private var customWindow: NSWindow?
+    private var customWindow: BorderlessWindow? // Use BorderlessWindow type
     private var hotKey: HotKey?
     private var reloadHotKey: HotKey?
     private var nextServiceHotKey: HotKey?
     
-    // Closures to trigger actions in ContentView
+    // Closures to trigger actions on the visible ContentView
+    // These closures will be set by the visible ContentView instance
     private var reloadWebViewAction: (() -> Void)?
     private var switchToNextServiceAction: (() -> Void)?
-
+    
     override init() {
         super.init()
         // Create the global hotkey for Cmd + J
@@ -152,24 +158,21 @@ class WindowManager: NSObject {
         reloadHotKey = HotKey(key: .r, modifiers: [.command])
         reloadHotKey?.keyDownHandler = { [weak self] in
             print("Cmd + R hotkey pressed.")
-            // Call the reload action when Cmd + R is pressed
-            self?.reloadWebViewAction?()
+            print("WindowManager: Attempting to call reloadAction closure.")
+            // Call the reload action closure stored in the window
+            self?.customWindow?.reloadAction?()
+            print("WindowManager: reloadAction closure call attempted.")
         }
         
         // Create the global hotkey for Cmd + /
-        nextServiceHotKey = HotKey(key: .slash, modifiers: [.command])
+        nextServiceHotKey = HotKey(key: .slash, modifiers: [.command]) // Corrected key name
         nextServiceHotKey?.keyDownHandler = { [weak self] in
             print("Cmd + / hotkey pressed.")
-            // Call the switch service action when Cmd + / is pressed
-            self?.switchToNextServiceAction?()
+            print("WindowManager: Attempting to call nextServiceAction closure.")
+            // Call the switch service action closure stored in the window
+            self?.customWindow?.nextServiceAction?()
+            print("WindowManager: nextServiceAction closure call attempted.")
         }
-    }
-
-    // Method to set the action closures from AppDelegate
-    func setActions(reload: @escaping () -> Void, nextService: @escaping () -> Void) {
-        print("WindowManager: setActions called.")
-        self.reloadWebViewAction = reload
-        self.switchToNextServiceAction = nextService
     }
 
     // Method to toggle the custom window's visibility
@@ -188,19 +191,15 @@ class WindowManager: NSObject {
             newWindow.center() // Center the window initially
 
             // Create an NSHostingView to wrap the SwiftUI ContentView
-            // Pass actions and window reference to ContentView
-             let contentView = ContentView(window: newWindow, reloadAction: { [weak self] in
-                 self?.performWebViewReload()
-             }, nextServiceAction: { [weak self] in
-                 self?.performSwitchToNextService()
-             })
-              let hostingView = NSHostingView(rootView: contentView)
-              newWindow.contentView = hostingView // Set directly as content view
+            // ContentView will set the actions on the window in its onAppear
+             let contentView = ContentView(window: newWindow)
+             let hostingView = NSHostingView(rootView: AnyView(contentView)) // Wrap in AnyView
+             newWindow.contentView = hostingView // Set directly as content view
 
             // Store the window in the class property
             customWindow = newWindow
             
-             // We no longer need to call setActions here, it will be called from AppDelegate
+            // Actions will be set on customWindow by ContentView in its onAppear
 
         }
 
@@ -225,27 +224,7 @@ class WindowManager: NSObject {
         }
     }
     
-    // Helper method to trigger WebView reload
-    private func performWebViewReload() {
-        print("WindowManager: performWebViewReload called.")
-        // Find the WebView within the window's hierarchy and call reload
-        if let webView = customWindow?.contentView?.findSubview(ofType: WKWebView.self) {
-            print("WindowManager: Found WKWebView, calling reload.")
-            webView.reload()
-            print("WindowManager: reload() called.")
-        } else {
-            print("WindowManager: Could not find WKWebView.")
-        }
-    }
-    
-    // Helper method to switch to the next service
-    private func performSwitchToNextService() {
-        print("WindowManager: performSwitchToNextService called.")
-        // This action will be set by AppDelegate and will call ContentView's selectNextService
-        print("WindowManager: Calling switchToNextServiceAction closure.")
-         self.switchToNextServiceAction?()
-         print("WindowManager: switchToNextServiceAction closure called.")
-    }
+    // We no longer need the perform helper methods here
 }
 
 @main
@@ -291,15 +270,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Initialize the WindowManager when the application finishes launching
         windowManager = WindowManager()
         
-        // Set the actions from ContentView in the WindowManager
-        // We need to create a ContentView instance here to get the actions.
-        // Note: This ContentView instance is only used to provide the closures and is not part of the visible hierarchy.
-        let tempContentView = ContentView(window: nil, reloadAction: { /* No-op */ }, nextServiceAction: { /* No-op */ })
-        print("AppDelegate: Setting actions in WindowManager.")
-        windowManager?.setActions(
-            reload: { print("AppDelegate: Reload action triggered."); tempContentView.reloadAction?() }, // Pass the reload action from tempContentView
-            nextService: { print("AppDelegate: Next Service action triggered."); tempContentView.selectNextService() } // Pass the selectNextService logic
-        )
+        // Removed code that was setting actions from a temporary ContentView
     }
 
     // Other optional NSApplicationDelegate methods can be added here if needed

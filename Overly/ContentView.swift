@@ -179,8 +179,6 @@ struct CustomTitleBar: View {
 struct ContentView: View {
     let window: NSWindow? // Add a property to hold the window reference
     @State private var selectedService: AIService = .chatgpt // State to hold the selected service
-    var reloadAction: (() -> Void)? // Closure to trigger reload
-    var nextServiceAction: (() -> Void)? // Closure to trigger next service switch
 
     var body: some View {
         VStack(spacing: 0) { // Use a VStack with no spacing
@@ -189,29 +187,65 @@ struct ContentView: View {
             // Pass the selected service URL down to WebView
             WebView(url: selectedService.url)
         }
-        // Trigger the next service action when selectedService changes (due to Cmd + / hotkey)
+        // Observe changes to selectedService (triggered by dropdown) and update WebView
         .onChange(of: selectedService) {
-            _ in // We don't need the old value
+            _ in
             print("ContentView: selectedService changed to \(selectedService.rawValue).")
-            // The nextServiceAction is triggered by the hotkey, which will update selectedService
-            // This onChange will react to that update and the WebView will refresh accordingly.
-            // No need to explicitly call nextServiceAction here.
+            // WebView will automatically update due to the binding
+        }
+        .onAppear {
+            print("ContentView: onAppear called.")
+            // When the view appears, pass the actions up to the WindowManager via the window
+            if let window = window as? BorderlessWindow {
+                 print("ContentView: Found BorderlessWindow in onAppear.")
+                 window.reloadAction = { 
+                     print("ContentView: reloadAction closure called from hotkey.")
+                     self.reloadWebView()
+                 }
+                 window.nextServiceAction = { 
+                     print("ContentView: nextServiceAction closure called from hotkey.")
+                     self.selectNextService()
+                 }
+                 print("ContentView: reloadAction and nextServiceAction set on window.")
+             } else {
+                 print("ContentView: Could not find BorderlessWindow in onAppear.")
+             }
         }
     }
     
-    // Function to find the next service in the enum
+    // Function to find the next service in the enum and switch to it
+    // Internal so WindowManager can call it directly
     internal func selectNextService() {
         print("ContentView: selectNextService called.")
+        print("ContentView: Current service before switch: \(selectedService.rawValue).")
         let allCases = AIService.allCases
         if let currentIndex = allCases.firstIndex(of: selectedService) {
             let nextIndex = (currentIndex + 1) % allCases.count
-            selectedService = allCases[nextIndex]
+            let nextService = allCases[nextIndex]
+            selectedService = nextService
+            print("ContentView: Calculated next service: \(nextService.rawValue).")
             print("ContentView: Switched to next service: \(selectedService.rawValue).")
+        } else {
+            print("ContentView: Could not find current service in allCases.")
         }
+    }
+    
+    // Function to trigger WebView reload
+    // Internal so WindowManager can call it directly
+    internal func reloadWebView() {
+        print("ContentView: reloadWebView called.")
+        // Find the WKWebView instance within the view hierarchy and call reload
+         if let webView = window?.contentView?.findSubview(ofType: WKWebView.self) {
+             print("ContentView: Found WKWebView, calling reload.")
+             webView.reload()
+             print("ContentView: reload() called.")
+         } else {
+             print("ContentView: Could not find WKWebView to reload.")
+         }
     }
 }
 
 #Preview {
     // Provide a dummy binding and actions for preview
-    ContentView(window: nil, reloadAction: {}, nextServiceAction: {})
+    ContentView(window: nil)
 }
