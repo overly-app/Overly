@@ -31,7 +31,7 @@ class WindowManager: NSObject {
         if customWindow == nil {
             print("customWindow is nil, creating new window.")
             // If the window hasn't been created yet, create it
-            let newWindow = NSWindow(
+            let newWindow = BorderlessWindow(
                 contentRect: NSRect(x: 0, y: 0, width: 600, height: 500), // Initial size
                 styleMask: [.borderless, .resizable], // No title bar or traffic lights + resizable
                 backing: .buffered,
