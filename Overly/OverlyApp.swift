@@ -71,13 +71,13 @@ struct OverlyApp: App {
     var body: some Scene {
         // A minimal WindowGroup just to satisfy macOS app structure requirements.
         // The main UI is in the custom borderless window managed by this App struct.
-         WindowGroup {
-           // This content is not intended to be the primary visible UI.
-           // We can leave it minimal or empty.
-            Text("Placeholder Window - Use Menu Bar")
-                .frame(width: 1, height: 1) // Make it very small, might help keep it from showing prominently
-                .hidden() // Attempt to hide this placeholder view
-         }
+//         WindowGroup {
+//           // This content is not intended to be the primary visible UI.
+//           // We can leave it minimal or empty.
+//            Text("Placeholder Window - Use Menu Bar")
+//                .frame(width: 1, height: 1) // Make it very small, might help keep it from showing prominently
+//                .hidden() // Attempt to hide this placeholder view
+//         }
 
         // Define the menu bar extra
         MenuBarExtra("Overly", systemImage: "globe") { // "Overly" is the text, "globe" is the icon
