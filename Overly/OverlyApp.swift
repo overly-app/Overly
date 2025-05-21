@@ -10,6 +10,81 @@ import AppKit
 import Combine
 import HotKey
 
+// Custom NSVisualEffectView subclass to handle masking for rounded top corners
+class MaskedVisualEffectView: NSVisualEffectView {
+    override func layout() {
+        super.layout()
+        applyCustomShapeMask()
+    }
+
+    // Method to apply the custom shape mask
+    func applyCustomShapeMask() {
+        let layer = CAShapeLayer()
+        let bounds = self.bounds
+        let cornerRadius: CGFloat = 10.0 // Define the corner radius
+
+        // Create a path with rounded top corners and straight bottom edges
+        let path = NSBezierPath(roundedRect: bounds, xRadius: cornerRadius, yRadius: cornerRadius)
+
+        // Create a rectangle that covers the bottom corners to make them square
+        let squareBottom = NSRect(x: bounds.minX, y: bounds.minY, width: bounds.width, height: cornerRadius)
+        path.append(NSBezierPath(rect: squareBottom))
+
+        layer.path = path.cgPath // Set the path
+        self.layer?.mask = layer // Apply the mask to the view's layer
+    }
+
+    // Ensure the mask is updated when the view's bounds change
+    override var bounds: NSRect {
+        didSet {
+            applyCustomShapeMask()
+        }
+    }
+}
+
+// Custom NSWindow subclass for a borderless window
+class BorderlessWindow: NSWindow {
+    override init(
+        contentRect: NSRect,
+        styleMask: NSWindow.StyleMask,
+        backing: NSWindow.BackingStoreType,
+        defer flag: Bool
+    ) {
+        super.init(contentRect: contentRect, styleMask: styleMask, backing: backing, defer: flag)
+
+        // Configure the window for a custom shape and no title bar
+        self.titlebarAppearsTransparent = true
+        self.titleVisibility = .hidden
+        self.isOpaque = false
+        self.backgroundColor = .clear
+        self.isMovableByWindowBackground = true
+
+        // Set a custom content view that will handle the shape and background
+        let customContentView = MaskedVisualEffectView(frame: contentRect)
+        customContentView.material = .contentBackground // Using .contentBackground material
+        customContentView.blendingMode = .behindWindow
+        customContentView.state = .active
+        customContentView.wantsLayer = true // Enable layers for masking
+
+        self.contentView = customContentView
+
+        // The mask is applied and updated in MaskedVisualEffectView's layout() and bounds.didSet
+
+        // Update the window's shadow based on the new shape
+        // This might need to be triggered after the content view's layout
+        DispatchQueue.main.async { // Ensure layout has potentially happened
+             self.invalidateShadow()
+        }
+    }
+
+    // Required initializer
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    // Removed incorrect resize and setFrame overrides
+}
+
 // Class to manage the window and hotkey
 class WindowManager: NSObject {
     private var customWindow: NSWindow?
@@ -38,15 +113,27 @@ class WindowManager: NSObject {
                 defer: false
             )
 
-            newWindow.isOpaque = false // Make it non-opaque
-            newWindow.backgroundColor = NSColor.clear // Clear background
-            newWindow.level = .floating // Keep it floating
             newWindow.center() // Center the window initially
-            newWindow.isMovableByWindowBackground = true // Allow dragging by background
 
             // Create an NSHostingView to wrap the SwiftUI ContentView
-            let hostingView = NSHostingView(rootView: ContentView(window: newWindow))
-            newWindow.contentView = hostingView // Set the SwiftUI view as the window's content
+            // Add the hosting view to the window's content view (which is the masked effect view)
+            if let effectView = newWindow.contentView as? MaskedVisualEffectView {
+                 let hostingView = NSHostingView(rootView: ContentView(window: newWindow))
+                 hostingView.translatesAutoresizingMaskIntoConstraints = false // Use constraints
+                 effectView.addSubview(hostingView)
+
+                 NSLayoutConstraint.activate([
+                     hostingView.leadingAnchor.constraint(equalTo: effectView.leadingAnchor),
+                     hostingView.trailingAnchor.constraint(equalTo: effectView.trailingAnchor),
+                     hostingView.topAnchor.constraint(equalTo: effectView.topAnchor),
+                     hostingView.bottomAnchor.constraint(equalTo: effectView.bottomAnchor)
+                 ])
+            } else {
+                // Fallback if contentView is not the expected masked effect view
+                print("Error: Window's contentView is not a MaskedVisualEffectView.")
+                 let hostingView = NSHostingView(rootView: ContentView(window: newWindow))
+                 newWindow.contentView = hostingView // Set directly if effect view is not available
+            }
 
             // Store the window in the class property
             customWindow = newWindow
@@ -90,11 +177,19 @@ struct OverlyApp: App {
 //         }
 
         // Define the menu bar extra
-        MenuBarExtra("Overly", systemImage: "globe") { // "Overly" is the text, "globe" is the icon
+        MenuBarExtra {
+            // Content remains the same
             Divider() // Add a separator line
             Button("Quit") {
                 NSApplication.shared.terminate(nil) // Add a Quit button
             }
+        } label: {
+            // Custom label view for more control
+            HStack {
+                Image(systemName: "globe") // System image
+                Text("Overly") // The text label
+            }
+            // .background(.ultrathinMaterial) // Apply ultrathin material background
         }
     }
 }

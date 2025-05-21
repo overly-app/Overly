@@ -21,7 +21,7 @@ struct CustomTitleBar: View {
         }
         .padding(.horizontal) // Add horizontal padding
         .frame(height: 30) // Set a fixed height for the title bar
-        .background(Color.black) // Set the background color to black
+        .background(.thinMaterial) // Set the background material
         .gesture(TapGesture(count: 2).onEnded({
             // Handle double-click to zoom
             window?.zoom(nil)
