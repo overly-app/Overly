@@ -42,9 +42,10 @@ class WindowManager: NSObject {
             newWindow.backgroundColor = NSColor.clear // Clear background
             newWindow.level = .floating // Keep it floating
             newWindow.center() // Center the window initially
+            newWindow.isMovableByWindowBackground = true // Allow dragging by background
 
             // Create an NSHostingView to wrap the SwiftUI ContentView
-            let hostingView = NSHostingView(rootView: ContentView())
+            let hostingView = NSHostingView(rootView: ContentView(window: newWindow))
             newWindow.contentView = hostingView // Set the SwiftUI view as the window's content
 
             // Store the window in the class property

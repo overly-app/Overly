@@ -10,6 +10,8 @@ import WebKit
 
 // Custom view for the title bar
 struct CustomTitleBar: View {
+    let window: NSWindow? // Add a property to hold the window reference
+
     var body: some View {
         HStack {
             Text("Overly")
@@ -20,13 +22,19 @@ struct CustomTitleBar: View {
         .padding(.horizontal) // Add horizontal padding
         .frame(height: 30) // Set a fixed height for the title bar
         .background(Color.black) // Set the background color to black
+        .gesture(TapGesture(count: 2).onEnded({
+            // Handle double-click to zoom
+            window?.zoom(nil)
+        }))
     }
 }
 
 struct ContentView: View {
+    let window: NSWindow? // Add a property to hold the window reference
+
     var body: some View {
         VStack(spacing: 0) { // Use a VStack with no spacing
-            CustomTitleBar() // Add our custom title bar at the top
+            CustomTitleBar(window: window) // Add our custom title bar at the top
             // Pass the binding down to WebView
             WebView(url: URL(string: "https://chatgpt.com")!)
         }
@@ -35,5 +43,5 @@ struct ContentView: View {
 
 #Preview {
     // Provide a dummy binding for preview
-    ContentView()
+    ContentView(window: nil)
 }
