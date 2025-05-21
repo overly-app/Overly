@@ -104,9 +104,16 @@ struct CustomTitleBar: View {
                 closeDropdownWorkItem?.cancel()
 
             }) {
-                Image(selectedService.iconName) // Use the custom asset name
-                    .resizable()
-                    .frame(width: 20, height: 20)
+                // Use Image(systemName:) for the settings icon, otherwise use Image(_:)
+                if selectedService == .settings {
+                    Image(systemName: selectedService.iconName) // Use systemName for SF Symbols
+                        .resizable()
+                        .frame(width: 20, height: 20)
+                } else {
+                    Image(selectedService.iconName) // Use asset catalog for other icons
+                        .resizable()
+                        .frame(width: 20, height: 20)
+                }
             }
             .buttonStyle(.plain) // Remove default button styling
             .onHover { isHovering in
@@ -122,8 +129,10 @@ struct CustomTitleBar: View {
             }
             .popover(isPresented: $showingDropdown, arrowEdge: .top) {
                 ServiceDropdownView(selectedService: $selectedService) {
-                    showingDropdown = false // Dismiss dropdown when an item is selected
-                    closeDropdownWorkItem?.cancel() // Cancel any pending close
+                    // Dismiss dropdown when an item is selected
+                    showingDropdown = false
+                    closeDropdownWorkItem?.cancel()
+                    // The view switching logic is now handled by the .onChange in ContentView
                 }
                 // Track hover state over the dropdown content
                 .onHover {
