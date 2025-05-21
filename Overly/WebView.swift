@@ -6,6 +6,7 @@ struct WebView: NSViewRepresentable {
     @Binding var shouldLoad: Bool // Accept the binding
 
     func makeNSView(context: Context) -> WKWebView {
+        
         let webView = WKWebView()
         // Perform an initial load when the view is created
         let request = URLRequest(url: url)
