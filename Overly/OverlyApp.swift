@@ -61,7 +61,6 @@ class WindowManager: NSObject {
             // Always attempt to make it key and order front when showing
             if !isVisible { // If the window *was* hidden and is now visible
                 print("Window was hidden, making visible and ordering front.")
-                NSApp.activate(ignoringOtherApps: true)
                 window.makeKeyAndOrderFront(nil)
             }
              else { // If the window *was* visible and is now hidden
