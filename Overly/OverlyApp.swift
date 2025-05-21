@@ -44,7 +44,7 @@ struct OverlyApp: App {
                     // If the window hasn't been created yet, create it
                     let newWindow = NSWindow(
                         contentRect: NSRect(x: 0, y: 0, width: 600, height: 500), // Initial size
-                        styleMask: [.borderless], // No title bar or traffic lights
+                        styleMask: [.borderless, .resizable], // Add .resizable here
                         backing: .buffered,
                         defer: false
                     )
