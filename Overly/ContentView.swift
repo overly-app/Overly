@@ -179,6 +179,8 @@ struct CustomTitleBar: View {
 struct ContentView: View {
     let window: NSWindow? // Add a property to hold the window reference
     @State private var selectedService: AIService = .chatgpt // State to hold the selected service
+    var reloadAction: (() -> Void)? // Closure to trigger reload
+    var nextServiceAction: (() -> Void)? // Closure to trigger next service switch
 
     var body: some View {
         VStack(spacing: 0) { // Use a VStack with no spacing
@@ -187,10 +189,29 @@ struct ContentView: View {
             // Pass the selected service URL down to WebView
             WebView(url: selectedService.url)
         }
+        // Trigger the next service action when selectedService changes (due to Cmd + / hotkey)
+        .onChange(of: selectedService) {
+            _ in // We don't need the old value
+            print("ContentView: selectedService changed to \(selectedService.rawValue).")
+            // The nextServiceAction is triggered by the hotkey, which will update selectedService
+            // This onChange will react to that update and the WebView will refresh accordingly.
+            // No need to explicitly call nextServiceAction here.
+        }
+    }
+    
+    // Function to find the next service in the enum
+    internal func selectNextService() {
+        print("ContentView: selectNextService called.")
+        let allCases = AIService.allCases
+        if let currentIndex = allCases.firstIndex(of: selectedService) {
+            let nextIndex = (currentIndex + 1) % allCases.count
+            selectedService = allCases[nextIndex]
+            print("ContentView: Switched to next service: \(selectedService.rawValue).")
+        }
     }
 }
 
 #Preview {
-    // Provide a dummy binding for preview
-    ContentView(window: nil)
+    // Provide a dummy binding and actions for preview
+    ContentView(window: nil, reloadAction: {}, nextServiceAction: {})
 }
