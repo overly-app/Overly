@@ -152,13 +152,16 @@ class WindowManager: NSObject, ObservableObject {
 
     override init() {
         super.init()
-        // Create the global hotkey for Cmd + J
-        hotKey = HotKey(key: .j, modifiers: [.command])
-        hotKey?.keyDownHandler = { [weak self] in
-            print("Cmd + J hotkey pressed.")
-            // Call the toggle window method when the hotkey is pressed
-            self?.toggleCustomWindowVisibility()
-        }
+        // Set up the toggle hotkey from settings
+        setupToggleHotkey()
+        
+        // Listen for hotkey changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(hotkeySettingsChanged),
+            name: NSNotification.Name("HotkeySettingsChanged"),
+            object: nil
+        )
 
         // Create the global hotkey for Cmd + R
         reloadHotKey = HotKey(key: .r, modifiers: [.command])
@@ -179,6 +182,38 @@ class WindowManager: NSObject, ObservableObject {
             self?.customWindow?.nextServiceAction?()
             print("WindowManager: nextServiceAction closure call attempted.")
         }
+    }
+    
+    // Method to set up the toggle hotkey from settings
+    private func setupToggleHotkey() {
+        let settings = AppSettings.shared
+        
+        // Convert NSEvent.ModifierFlags to HotKey modifiers
+        var hotkeyModifiers: NSEvent.ModifierFlags = []
+        if settings.toggleHotkeyModifiers.contains(.command) {
+            hotkeyModifiers.insert(.command)
+        }
+        if settings.toggleHotkeyModifiers.contains(.option) {
+            hotkeyModifiers.insert(.option)
+        }
+        if settings.toggleHotkeyModifiers.contains(.control) {
+            hotkeyModifiers.insert(.control)
+        }
+        if settings.toggleHotkeyModifiers.contains(.shift) {
+            hotkeyModifiers.insert(.shift)
+        }
+        
+        // Create the hotkey
+        hotKey = HotKey(key: settings.toggleHotkeyKey, modifiers: hotkeyModifiers)
+        hotKey?.keyDownHandler = { [weak self] in
+            print("Toggle hotkey pressed.")
+            self?.toggleCustomWindowVisibility()
+        }
+    }
+    
+    // Method called when hotkey settings change
+    @objc private func hotkeySettingsChanged() {
+        setupToggleHotkey()
     }
 
     // Method to toggle the custom window's visibility

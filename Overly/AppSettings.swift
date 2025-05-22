@@ -1,5 +1,6 @@
 import SwiftUI
 import Foundation
+import HotKey
 
 struct ChatProvider: Identifiable, Codable, Equatable {
     let id: String
@@ -29,11 +30,15 @@ class AppSettings: ObservableObject {
     private let providersKey = "customProviders"
     private let activeProvidersKey = "activeProviderIds"
     private let faviconCacheKey = "faviconCache"
+    private let toggleHotkeyKeyKey = "toggleHotkeyKey"
+    private let toggleHotkeyModifiersKey = "toggleHotkeyModifiers"
 
     @Published var customProviders: [ChatProvider] = []
     @Published var activeProviderIds: Set<String> = Set()
     @Published var faviconCache: [String: Data] = [:]
     @Published var showInDock: Bool = true
+    @Published var toggleHotkeyKey: Key = .j
+    @Published var toggleHotkeyModifiers: NSEvent.ModifierFlags = [.command]
     
     // Computed property to get all providers (built-in + custom)
     var allBuiltInProviders: [ChatProvider] {
@@ -70,9 +75,20 @@ class AppSettings: ObservableObject {
            let decodedFaviconCache = try? JSONDecoder().decode([String: Data].self, from: savedFaviconData) {
             faviconCache = decodedFaviconCache
         }
+        
+        // Load toggle hotkey settings
+        if let keyRawValue = userDefaults.object(forKey: toggleHotkeyKeyKey) as? UInt16 {
+            if let key = Key(carbonKeyCode: UInt32(keyRawValue)) {
+                toggleHotkeyKey = key
+            }
+        }
+        
+        if let modifiersRawValue = userDefaults.object(forKey: toggleHotkeyModifiersKey) as? UInt {
+            toggleHotkeyModifiers = NSEvent.ModifierFlags(rawValue: modifiersRawValue)
+        }
     }
     
-    func saveProviders() {
+    func saveSettings() {
         // Save custom providers
         if let encodedProviders = try? JSONEncoder().encode(customProviders) {
             userDefaults.set(encodedProviders, forKey: providersKey)
@@ -87,13 +103,27 @@ class AppSettings: ObservableObject {
         if let encodedFaviconCache = try? JSONEncoder().encode(faviconCache) {
              userDefaults.set(encodedFaviconCache, forKey: faviconCacheKey)
         }
+        
+        // Save toggle hotkey settings
+        userDefaults.set(UInt16(toggleHotkeyKey.carbonKeyCode), forKey: toggleHotkeyKeyKey)
+        userDefaults.set(toggleHotkeyModifiers.rawValue, forKey: toggleHotkeyModifiersKey)
+    }
+    
+    // Method to update the toggle hotkey
+    func updateToggleHotkey(key: Key, modifiers: NSEvent.ModifierFlags) {
+        toggleHotkeyKey = key
+        toggleHotkeyModifiers = modifiers
+        saveSettings()
+        
+        // Notify that hotkey settings changed
+        NotificationCenter.default.post(name: NSNotification.Name("HotkeySettingsChanged"), object: nil)
     }
     
     // Method to add a new custom provider
     func addCustomProvider(_ provider: ChatProvider) {
         customProviders.append(provider)
         activeProviderIds.insert(provider.id)
-        saveProviders()
+        saveSettings()
     }
     
     // Method to remove a custom provider
@@ -101,7 +131,7 @@ class AppSettings: ObservableObject {
         customProviders.removeAll(where: { $0.id == id })
         activeProviderIds.remove(id)
         faviconCache.removeValue(forKey: id)
-        saveProviders()
+        saveSettings()
     }
     
     // Method to toggle active state of a provider
@@ -111,21 +141,21 @@ class AppSettings: ObservableObject {
         } else {
             activeProviderIds.insert(id)
         }
-        saveProviders()
+        saveSettings()
     }
     
     // Method to update the name of a custom provider
     func updateCustomProviderName(id: String, newName: String) {
         if let index = customProviders.firstIndex(where: { $0.id == id }) {
             customProviders[index].name = newName
-            saveProviders()
+            saveSettings()
         }
     }
     
     // Method to save a favicon image data for a provider
     func saveFavicon(id: String, data: Data) {
         faviconCache[id] = data
-        saveProviders()
+        saveSettings()
     }
     
     // Method to get a favicon Image from cache
@@ -144,7 +174,7 @@ class AppSettings: ObservableObject {
         // Clear existing favicon data if any
         DispatchQueue.main.async {
             self.faviconCache.removeValue(forKey: provider.id)
-            self.saveProviders() // Save the change immediately
+            self.saveSettings() // Save the change immediately
         }
         
         // Attempt to fetch /favicon.ico first

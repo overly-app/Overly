@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AppKit
+import HotKey
 
 struct GeneralSettingsView: View {
     @ObservedObject var settings = AppSettings.shared // Use the shared settings instance
@@ -37,6 +38,15 @@ struct GeneralSettingsView: View {
                 }
             
             Divider() // Add a separator
+            
+            // Keybind recorder
+            KeybindRecorderView(
+                key: $settings.toggleHotkeyKey,
+                modifiers: $settings.toggleHotkeyModifiers
+            )
+            .padding(.top)
+            
+            Divider() // Add another separator
             
             // Button to reset onboarding
             Button("Reset Onboarding") {

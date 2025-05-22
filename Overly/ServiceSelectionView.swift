@@ -175,7 +175,7 @@ struct ServiceSelectionView: View {
 
             Button("Finish Setup") {
                 // Save settings and call the completion action
-                settings.saveProviders() // Ensure latest changes are saved
+                settings.saveSettings() // Ensure latest changes are saved
                 onCompletion()
             }
             .padding()
@@ -193,7 +193,7 @@ struct ServiceSelectionView: View {
         settings.customProviders.removeAll { $0.id == id }
         settings.activeProviderIds.remove(id)
         settings.faviconCache.removeValue(forKey: id)
-        settings.saveProviders()
+        settings.saveSettings()
     }
 }
 
