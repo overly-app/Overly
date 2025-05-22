@@ -307,10 +307,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Initialize the WindowManager when the application finishes launching
         windowManager = WindowManager()
         
-        // Removed code that was setting actions from a temporary ContentView
+        // Read the initial showInDock setting and set the activation policy
+        if AppSettings.shared.showInDock {
+            NSApp.setActivationPolicy(.regular) // Show in Dock
+            // Show the window immediately on launch if showing in dock
+            windowManager?.toggleCustomWindowVisibility()
+        } else {
+            NSApp.setActivationPolicy(.accessory) // Hide from Dock
+            // When hiding the dock icon on launch, explicitly activate the application
+            // so the menu bar icon is immediately available and the app is responsive.
+            NSApp.activate(ignoringOtherApps: true)
+            // Do NOT show the window immediately on launch if hiding from dock.
+            // The user will use the hotkey to show it.
+        }
         
-        // Show the window immediately on launch
-        windowManager?.toggleCustomWindowVisibility()
+        // Removed code that was setting actions from a temporary ContentView
     }
 
     // Other optional NSApplicationDelegate methods can be added here if needed

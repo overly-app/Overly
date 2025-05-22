@@ -20,28 +20,33 @@ struct GeneralSettingsView: View {
                 .font(.largeTitle)
             
             // Bind Toggle directly to the settings property
-            Toggle("Show in Dock", isOn: $settings.showInDock) // Use standard binding
-                // Removed .onChange here
+            Toggle("Show in Dock", isOn: $settings.showInDock)
+                .onChange(of: settings.showInDock) { newValue in
+                    // Explicitly set the activation policy when the toggle changes
+                    if newValue {
+                        NSApp.setActivationPolicy(.regular)
+                    } else {
+                        NSApp.setActivationPolicy(.accessory)
+                        // Explicitly activate the application when hiding the dock icon
+                        // This might be necessary for the change to take effect immediately.
+                        NSApp.activate(ignoringOtherApps: true)
+                    }
+                }
             
             Spacer()
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading) // Align content to top leading
-        // Use .onReceive to react to changes in the ObservedObject
-        .onReceive(settings.objectWillChange) { _ in
-            // Update the application's activation policy when settings change
-            // This publisher fires before the change, so the view will re-render
-            // We can apply the policy change based on the new state after the render
-            // However, setting the policy directly here is simpler and often works.
-            if settings.showInDock {
-                NSApp.setActivationPolicy(.regular)
-            } else {
-                NSApp.setActivationPolicy(.accessory)
-            }
-        }
+        // Remove the onReceive as the onChange on the Toggle is more direct
+        //.onReceive(settings.objectWillChange) { _ in
+        //    if settings.showInDock {
+        //        NSApp.setActivationPolicy(.regular)
+        //    } else {
+        //        NSApp.setActivationPolicy(.accessory)
+        //    }
+        //}
         .onAppear {
-            // No need to initialize local state from settings on appear anymore
-            // We still might want to set the initial policy on appear
+            // Set the initial policy on appear
              if settings.showInDock {
                  NSApp.setActivationPolicy(.regular)
              } else {
