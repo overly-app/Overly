@@ -1,8 +1,23 @@
 import SwiftUI
 
+// Custom button style to ensure proper color handling
+struct OnboardingButtonStyle: ButtonStyle {
+    @Environment(\.colorScheme) var colorScheme
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 24)
+            .padding(.vertical, 12)
+            .background(colorScheme == .dark ? Color.white : Color.black)
+            .foregroundColor(colorScheme == .dark ? Color.black : Color.white)
+            .cornerRadius(8)
+    }
+}
+
 struct OnboardingView: View {
     // Use AppStorage to manage the onboarding state
     @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
+    @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
         VStack {
@@ -15,27 +30,32 @@ struct OnboardingView: View {
 
             // App Icon (Using the new asset name 'AppIconOnboarding')
             // The scaling will be handled by aspectRatio and frame
-            Image("AppIconOnboarding") // Changed from "AppIcon"
+            Image("AppIconOnboarding")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 200, height: 200) // Adjust size as needed
+                .frame(width: 200, height: 200)
                 .padding()
 
             Spacer()
 
-            // Continue Button
-            Button("Continue") {
-                // Mark onboarding as complete
-                hasCompletedOnboarding = true
-            }
-            .padding()
-            .buttonStyle(.borderedProminent) // Use a prominent style
+            // Debug text to verify view hierarchy
 
-            Spacer() // Add some space below the button
+            // Continue Button
+            Button(action: {
+                hasCompletedOnboarding = true
+            }) {
+                HStack(spacing: 8) {
+                    Text("Continue")
+                    Image(systemName: "arrow.right")
+                }
+            }
+            .buttonStyle(OnboardingButtonStyle())
+
+
+            Spacer()
         }
-        .padding() // Add padding around the content
-        .frame(width: 700, height: 400) // Explicitly set the frame size
-        // We can adjust the frame later in the App struct if needed for window size
+        .padding()
+        .frame(width: 700, height: 400)
     }
 }
 

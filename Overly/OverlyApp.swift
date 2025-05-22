@@ -70,9 +70,6 @@ class BorderlessWindow: NSWindow {
         // Set window level to floating so it stays above other windows
         self.level = .floating
 
-        // Set window appearance to match system
-        self.appearance = NSAppearance(named: .vibrantDark)
-
         // Set a custom content view that will handle the shape and background
         let customContentView = MaskedVisualEffectView(frame: contentRect)
         // Use .HUDWindow for a thin, translucent material
