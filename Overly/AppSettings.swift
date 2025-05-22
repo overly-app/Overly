@@ -33,6 +33,7 @@ class AppSettings: ObservableObject {
     @Published var customProviders: [ChatProvider] = []
     @Published var activeProviderIds: Set<String> = Set()
     @Published var faviconCache: [String: Data] = [:]
+    @Published var showInDock: Bool = false
     
     // Computed property to get all providers (built-in + custom)
     var allBuiltInProviders: [ChatProvider] {

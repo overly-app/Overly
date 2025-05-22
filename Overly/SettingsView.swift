@@ -8,182 +8,72 @@
 import SwiftUI
 import AppKit
 
-// Extracted view for a single provider row
-struct ProviderRowView: View {
-    @ObservedObject var settings: AppSettings // Observe AppSettings
-    let provider: ChatProvider
-    
-    var body: some View {
-        HStack {
-            // Display icon: Try favicon, then system image, then asset
-            Group {
-                if let favicon = settings.faviconImage(for: provider) {
-                    favicon
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 20, height: 20)
-                } else if provider.isSystemImage {
-                    Image(systemName: provider.iconName)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 20, height: 20)
-                } else {
-                    Image(provider.iconName) // Assuming iconName is a valid asset or placeholder
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 20, height: 20)
-                }
-            }
-            .onAppear {
-                // Attempt to fetch favicon if it's a web provider without a cached icon
-                if provider.url != nil && settings.faviconCache[provider.id] == nil {
-                    Task {
-                        await settings.fetchFavicon(for: provider)
-                    }
-                }
-            }
+// Settings categories
+enum SettingsCategory: String, CaseIterable, Identifiable {
+    case general = "General"
+    case providers = "Providers"
 
-            Text(provider.name)
-
-            Spacer()
-
-            if provider.url != nil { // Only show toggle for web providers
-                Toggle("Active", isOn: Binding(get: {
-                    settings.activeProviderIds.contains(provider.id)
-                }, set: {
-                    isActive in
-                    settings.toggleActiveProvider(id: provider.id)
-                }))
-                .labelsHidden()
-            }
-
-            // Option to remove custom providers
-            if settings.customProviders.contains(where: { $0.id == provider.id }) {
-                Button(action: {
-                    settings.removeCustomProvider(id: provider.id)
-                }) {
-                    Image(systemName: "minus.circle")
-                        .foregroundColor(.red)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.vertical, 2)
-    }
-}
-
-// Extracted view for adding a new provider
-struct AddProviderView: View {
-    @ObservedObject var settings: AppSettings
-    @Binding var newProviderName: String
-    @Binding var newProviderURLString: String
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Add Custom Provider")
-                .font(.headline)
-
-            TextField("Name", text: $newProviderName)
-            TextField("URL", text: $newProviderURLString)
-
-            Button("Add Provider") {
-                if !newProviderName.isEmpty && !newProviderURLString.isEmpty {
-                    var urlString = newProviderURLString
-                    // Prepend https:// if no scheme is present
-                    if !urlString.lowercased().hasPrefix("http://") && !urlString.lowercased().hasPrefix("https://") {
-                        urlString = "https://" + urlString
-                    }
-
-                    if let url = URL(string: urlString) {
-                        let newProvider = ChatProvider(
-                            id: UUID().uuidString, // Unique ID for custom providers
-                            name: newProviderName,
-                            url: url,
-                            iconName: "link", // Default placeholder icon
-                            isSystemImage: true // Use system image for placeholder
-                        )
-                        settings.addCustomProvider(newProvider)
-                        // Attempt to fetch favicon immediately after adding
-                        Task {
-                             await settings.fetchFavicon(for: newProvider)
-                         }
-                        // Clear input fields
-                        newProviderName = ""
-                        newProviderURLString = ""
-                    } else {
-                         // Optionally, show an alert to the user that the URL is invalid
-                         print("Invalid URL entered: \(newProviderURLString)")
-                    }
-                }
-            }
-            .disabled(newProviderName.isEmpty || newProviderURLString.isEmpty)
-        }
-    }
+    var id: String { self.rawValue }
 }
 
 struct SettingsView: View {
     @ObservedObject var settings = AppSettings.shared // Use the shared settings instance
-    @Environment(\.presentationMode) var presentationMode // To dismiss the view, though we are replacing window content
     
-    // Keep a reference to the WindowManager to allow switching back to the web view
+    // Keep a reference to the WindowManager (optional, might not be needed directly here anymore)
     weak var windowManager: WindowManager? // Use weak to avoid retain cycles
     
-    @State private var newProviderName: String = ""
-    @State private var newProviderURLString: String = ""
-    
-    // Computed property for the list of all providers to simplify the ForEach
-    private var allProviders: [ChatProvider] {
-        settings.allBuiltInProviders + settings.customProviders
-    }
+    @State private var selectedCategory: SettingsCategory? = .general // State for selected sidebar item
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Settings")
-                .font(.largeTitle)
-
-            // Section for managing providers
-            ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Manage Providers")
-                        .font(.headline)
-
-                    // List of all providers (built-in and custom)
-                    ForEach(allProviders) {
-                        provider in
-                        ProviderRowView(settings: settings, provider: provider) // Use the extracted view
-                    }
+        NavigationView { // Use NavigationView for sidebar layout
+            // Sidebar
+            List(SettingsCategory.allCases, selection: $selectedCategory) { category in
+                NavigationLink(destination: destinationView(for: category)) {
+                    Label(category.rawValue, systemImage: iconName(for: category))
                 }
             }
-
-            Divider()
-
-            // Section for adding custom providers
-            AddProviderView(settings: settings, newProviderName: $newProviderName, newProviderURLString: $newProviderURLString) // Use the extracted view
-
-            Spacer()
+            .listStyle(SidebarListStyle()) // Apply macOS sidebar style
+            .frame(minWidth: 150) // Set minimum width for the sidebar
+            .navigationTitle("Settings") // Set title for the sidebar
             
-            // Add a button to go back to the main web view (if windowManager is available)
-            if windowManager != nil {
-                Button("Back to Web View") {
-                    windowManager?.showWebView()
-                }
-            }
+            // Detail view (content area)
+            // Display a default view if no category is selected
+             if let selectedCategory = selectedCategory {
+                 destinationView(for: selectedCategory) // Display the selected category's view
+             } else {
+                 // Default view when no category is selected
+                 Text("Select a category")
+                     .foregroundColor(.secondary)
+             }
         }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity) // Expand to fill the window
-        .onAppear {
-            // Pre-fetch favicons for active built-in providers when settings appear
-            for provider in settings.allBuiltInProviders where settings.activeProviderIds.contains(provider.id) && provider.url != nil && settings.faviconCache[provider.id] == nil {
-                 Task {
-                      await settings.fetchFavicon(for: provider)
-                  }
-            }
+        .frame(minWidth: 500, minHeight: 300) // Set minimum size for the settings window
+    }
+    
+    // Helper to determine the destination view for a category
+    @ViewBuilder
+    private func destinationView(for category: SettingsCategory) -> some View {
+        switch category {
+        case .general:
+            GeneralSettingsView(settings: settings) // Pass the settings object
+        case .providers:
+            ProviderSettingsView(settings: settings) // Pass the settings object
+        }
+    }
+    
+    // Helper to determine the sidebar icon for a category
+    private func iconName(for category: SettingsCategory) -> String {
+        switch category {
+        case .general: return "gearshape"
+        case .providers: return "puzzlepiece"
         }
     }
 }
 
+// Remove the duplicate definitions for ProviderRowView and AddProviderView
+// These should now be in ProviderSettingsView.swift
+
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
-        SettingsView(windowManager: nil) // Pass nil for preview
+        SettingsView(windowManager: nil)
     }
 } 
