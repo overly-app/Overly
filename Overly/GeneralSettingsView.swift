@@ -14,6 +14,9 @@ struct GeneralSettingsView: View {
     // We no longer need the localShowInDock state
     // @State private var localShowInDock: Bool = false // Local state for the toggle
     
+    // Access the AppStorage variable to reset onboarding
+    @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("General Settings")
@@ -32,6 +35,14 @@ struct GeneralSettingsView: View {
                         NSApp.activate(ignoringOtherApps: true)
                     }
                 }
+            
+            Divider() // Add a separator
+            
+            // Button to reset onboarding
+            Button("Reset Onboarding") {
+                hasCompletedOnboarding = false // Set the flag to false
+            }
+            .padding(.top)
             
             Spacer()
         }

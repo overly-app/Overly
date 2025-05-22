@@ -274,60 +274,69 @@ struct ContentView: View {
     @ObservedObject var settings = AppSettings.shared // Observe AppSettings
 
     @State private var selectedProvider: ChatProvider? // Change to ChatProvider?
+    
+    // Add the AppStorage variable back inside the struct
+    @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
 
     var body: some View {
-        // Use a Group to conditionally display content
-        VStack(spacing: 0) { // Use a VStack with no spacing for the main content area
-            // Always display the custom title bar
-            CustomTitleBar(window: window, selectedProvider: $selectedProvider, settings: settings) // Pass selectedProvider binding and settings
-            
-            // Switch the main content based on the current view state
-            Group { // Use a Group to conditionally display content below the title bar
-                switch windowManager.currentView {
-                case .webView:
-                    // Display the WebView when in webView state
-                    // Use the URL from the selectedProvider
-                    if let provider = selectedProvider, let url = provider.url {
-                        WebView(url: url)
-                    } else {
-                        // Handle case where no provider is selected or selected provider has no URL
-                         Color.clear // Or some placeholder view
-                    }
+        // Check if onboarding is completed
+        if hasCompletedOnboarding {
+            // Original content when onboarding is done
+            VStack(spacing: 0) { // Use a VStack with no spacing for the main content area
+                // Always display the custom title bar
+                CustomTitleBar(window: window, selectedProvider: $selectedProvider, settings: settings) // Pass selectedProvider binding and settings
+                
+                // Switch the main content based on the current view state
+                Group { // Use a Group to conditionally display content below the title bar
+                    switch windowManager.currentView {
+                    case .webView:
+                        // Display the WebView when in webView state
+                        // Use the URL from the selectedProvider
+                        if let provider = selectedProvider, let url = provider.url {
+                            WebView(url: url)
+                        } else {
+                            // Handle case where no provider is selected or selected provider has no URL
+                             Color.clear // Or some placeholder view
+                        }
 
-                case .settingsView:
-                    // Display the SettingsView when in settingsView state
-                    SettingsView(windowManager: windowManager) // Pass the windowManager
+                    case .settingsView:
+                        // Display the SettingsView when in settingsView state
+                        SettingsView(windowManager: windowManager) // Pass the windowManager
+                    }
                 }
-            }
-            // The main VStack will inherit the padding and background from ContentView's modifiers if any are applied to ContentView itself.
-            // Or, we can apply background/padding here if needed.
+                // The main VStack will inherit the padding and background from ContentView's modifiers if any are applied to ContentView itself.
+                // Or, we can apply background/padding here if needed.
 //            .background(.thinMaterial) // Example: Apply background here if not on ContentView
 //            .padding() // Example: Apply padding here if not on ContentView
-        }
-        // Observe changes to selectedProvider and update view state
-        .onChange(of: selectedProvider) { newValue in // Use newValue
-            // If the selected provider is the settings provider, switch to settings view
-            if newValue?.id == AIService.settings.rawValue {
-                windowManager.showSettingsView()
-            } else {
-                // Otherwise, ensure we are in web view state
-                windowManager.showWebView()
             }
-        }
-        .onAppear {
-            // When the view appears, pass the actions up to the WindowManager via the window
-            if let window = window as? BorderlessWindow {
-                 window.reloadAction = { self.reloadWebView() }
-                 window.nextServiceAction = { self.selectNextService() }
-             }
-             // Initialize selectedProvider to the first active provider or settings if no active web providers
-             if selectedProvider == nil {
-                 if let firstActiveWebProvider = settings.activeProviders.first(where: { $0.url != nil }) {
-                      selectedProvider = firstActiveWebProvider
-                 } else if let settingsProvider = settings.allBuiltInProviders.first(where: { $0.id == AIService.settings.rawValue }) {
-                      selectedProvider = settingsProvider
+            // Observe changes to selectedProvider and update view state
+            .onChange(of: selectedProvider) { newValue in // Use newValue
+                // If the selected provider is the settings provider, switch to settings view
+                if newValue?.id == AIService.settings.rawValue {
+                    windowManager.showSettingsView()
+                } else {
+                    // Otherwise, ensure we are in web view state
+                    windowManager.showWebView()
+                }
+            }
+            .onAppear {
+                // When the view appears, pass the actions up to the WindowManager via the window
+                if let window = window as? BorderlessWindow {
+                     window.reloadAction = { self.reloadWebView() }
+                     window.nextServiceAction = { self.selectNextService() }
                  }
+                 // Initialize selectedProvider to the first active provider or settings if no active web providers
+                 if selectedProvider == nil { // Only initialize if not already set (e.g., by a previous onboarding step setting it)
+                     if let firstActiveWebProvider = settings.activeProviders.first(where: { $0.url != nil }) {
+                          selectedProvider = firstActiveWebProvider
+                     } else if let settingsProvider = settings.allBuiltInProviders.first(where: { $0.id == AIService.settings.rawValue }) {
+                          selectedProvider = settingsProvider
+                     }
+                }
             }
+        } else {
+            // Display OnboardingView if onboarding is not complete
+            OnboardingView()
         }
     }
     
@@ -359,5 +368,5 @@ struct ContentView: View {
 
 #Preview {
     // Provide a dummy binding and actions for preview
-    ContentView(window: nil, windowManager: WindowManager())
+    ContentView(window: nil, windowManager: WindowManager()) // Pass dummy windowManager
 }

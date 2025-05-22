@@ -54,7 +54,8 @@ struct SettingsView: View {
     private func destinationView(for category: SettingsCategory) -> some View {
         switch category {
         case .general:
-            GeneralSettingsView(settings: settings) // Pass the settings object
+            GeneralSettingsView(settings: settings)
+            // TODO: Add a button here to reset the onboarding status (set hasCompletedOnboarding to false)
         case .providers:
             ProviderSettingsView(settings: settings) // Pass the settings object
         }
