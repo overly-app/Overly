@@ -15,6 +15,59 @@ struct OnboardingButtonStyleServiceSelection: ButtonStyle {
     }
 }
 
+// Custom view for the provider chip design
+struct ProviderChipView: View {
+    @Environment(\.colorScheme) var colorScheme
+    let provider: ChatProvider
+    @ObservedObject var settings: AppSettings
+    let onDelete: (String) -> Void // Action to perform when deleting a custom provider
+
+    var isSelected: Bool {
+        settings.activeProviderIds.contains(provider.id)
+    }
+
+    var body: some View {
+        Button(action: {
+            settings.toggleActiveProvider(id: provider.id)
+        }) {
+            HStack {
+                ServiceIconView(provider: provider, settings: settings)
+                Text(provider.name)
+                    .foregroundColor(isSelected ? (colorScheme == .dark ? .black : .white) : .primary)
+                    .fontWeight(isSelected ? .bold : .regular)
+
+                // Add remove button for custom providers
+                if settings.customProviders.contains(where: { $0.id == provider.id }) {
+                    Button(action: {
+                        onDelete(provider.id)
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.gray)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(isSelected ? (colorScheme == .dark ? .white : .black) : (colorScheme == .dark ? Color.gray.opacity(0.2) : Color.gray.opacity(0.1)))
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(isSelected ? (colorScheme == .dark ? .white : .black) : .clear, lineWidth: isSelected ? 2 : 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 16)) // Make the whole chip tappable
+        }
+        .buttonStyle(.plain) // Use plain button style to avoid default button appearance
+        .contextMenu { // Add context menu for deletion, only for custom providers
+            if settings.customProviders.contains(where: { $0.id == provider.id }) {
+                Button("Delete", role: .destructive) {
+                    onDelete(provider.id)
+                }
+            }
+        }
+    }
+}
+
 struct ServiceSelectionView: View {
     // Add a binding or action to dismiss this view and proceed
     let onCompletion: () -> Void
@@ -32,71 +85,46 @@ struct ServiceSelectionView: View {
 
             // Section for Built-in Providers
             VStack(alignment: .leading) {
-                Text("Default Providers")
+                Text("Providers")
                     .font(.headline)
                     .padding(.leading)
 
-                List {
-                    // Show all built-in providers except 'Settings'
-                    ForEach(settings.allBuiltInProviders.filter { $0.url != nil }) {
-                        provider in
-                        Toggle(isOn: Binding( // Use Binding to allow toggling Set<String>
-                            get: { settings.activeProviderIds.contains(provider.id) },
-                            set: { isActive in
-                                settings.toggleActiveProvider(id: provider.id)
-                            }
-                        )) {
-                            HStack {
-                                // Display icon - consolidated logic
-                                ServiceIconView(provider: provider, settings: settings)
-                                Text(provider.name)
-                            }
+                ScrollView(.horizontal, showsIndicators: false) { // Use ScrollView for horizontal scrolling
+                    HStack {
+                        // Show all built-in providers except 'Settings'
+                        ForEach(settings.allBuiltInProviders.filter { $0.url != nil }) { provider in
+                            ProviderChipView(provider: provider, settings: settings, onDelete: deleteCustomProvider) // Use the new chip view
                         }
                     }
-                    
-                    // Show Custom Providers
-                    Section(header: Text("Custom Providers")) { // Add Section header
-                        ForEach(settings.customProviders) {
-                            provider in
-                            Toggle(isOn: Binding( // Use Binding to allow toggling Set<String>
-                                get: { settings.activeProviderIds.contains(provider.id) },
-                                set: { isActive in
-                                    settings.toggleActiveProvider(id: provider.id)
-                                }
-                            )) {
-                                HStack {
-                                    // Display icon - consolidated logic
-                                    ServiceIconView(provider: provider, settings: settings)
-                                    Text(provider.name)
-
-                                    Spacer() // Push the minus button to the right
-
-                                    // Minus button to delete custom provider
-                                    Button(action: {
-                                        deleteCustomProvider(id: provider.id) // Call delete function with provider ID
-                                    }) {
-                                        Image(systemName: "minus.circle")
-                                            .foregroundColor(.red) // Make the minus button red
-                                    }
-                                    .buttonStyle(.plain) // Use plain button style
-                                }
-                                .contextMenu { // Add context menu for deletion
-                                    Button("Delete", role: .destructive) {
-                                        deleteCustomProvider(id: provider.id) // Call delete function with provider ID
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    .padding(.horizontal) // Add horizontal padding to the HStack inside the ScrollView
                 }
-                .frame(height: 200) // Give the list a fixed height for now
+                .frame(height: 60) // Give the ScrollView a fixed height
             }
-            .padding(.horizontal)
+            // No padding bottom here, let the divider handle spacing
 
             Divider() // Add a divider between sections
-                .padding(.vertical, 30) // Increase vertical padding for bigger separation
+                .padding(.vertical, 20) // Adjusted padding
 
             // Section for Custom Providers
+            VStack(alignment: .leading) {
+                Text("Custom Providers")
+                    .font(.headline)
+                    .padding(.leading)
+
+                ScrollView(.horizontal, showsIndicators: false) { // Use ScrollView for horizontal scrolling
+                    HStack {
+                        // Show Custom Providers
+                        ForEach(settings.customProviders) { provider in
+                            ProviderChipView(provider: provider, settings: settings, onDelete: deleteCustomProvider) // Use the new chip view
+                        }
+                    }
+                    .padding(.horizontal) // Add horizontal padding to the HStack inside the ScrollView
+                }
+                .frame(height: 60) // Give the ScrollView a fixed height
+            }
+            .padding(.bottom) // Add padding bottom after the custom providers section
+
+            // Section for Add Custom Provider
             VStack(alignment: .leading) {
                 Text("Add Custom Provider")
                     .font(.headline)
@@ -140,17 +168,8 @@ struct ServiceSelectionView: View {
                     .buttonStyle(.bordered)
                 }
                 .padding(.horizontal)
-
-                // We are now showing custom providers in the main list
-                // This separate list is commented out
-                // List of Custom Services (Optional - could add later)
-                // List {
-                //     ForEach(settings.customProviders) { provider in
-                //         Text(provider.name)
-                //     }
-                // }
             }
-            .padding(.bottom)
+            .padding(.bottom) // Add padding after the add custom provider section
 
             Spacer() // Pushes content to the top
 
@@ -169,20 +188,7 @@ struct ServiceSelectionView: View {
         .frame(width: 800, height: 500) // Match the onboarding window size
     }
 
-    // Function to handle deleting custom providers
-    func deleteCustomProvider(at offsets: IndexSet) {
-        settings.customProviders.remove(atOffsets: offsets)
-        // Also remove the corresponding IDs from activeProviderIds
-        for index in offsets {
-            let providerId = settings.customProviders[index].id // Get the ID BEFORE removal
-            settings.activeProviderIds.remove(providerId)
-             // Remove favicon data for the deleted provider
-             settings.faviconCache.removeValue(forKey: providerId)
-        }
-        settings.saveProviders()
-    }
-
-    // Function to handle deleting a custom provider by ID
+    // Function to handle deleting custom providers by ID
     func deleteCustomProvider(id: String) {
         settings.customProviders.removeAll { $0.id == id }
         settings.activeProviderIds.remove(id)
