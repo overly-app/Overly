@@ -37,24 +37,17 @@ enum AIService: String, CaseIterable, Identifiable {
 
 // Custom view for the dropdown menu content
 struct ServiceDropdownView: View {
-    @Binding var selectedService: AIService
+    @Binding var selectedProvider: ChatProvider? // Change to ChatProvider?
     var dismiss: () -> Void
     @ObservedObject var settings: AppSettings // Observe AppSettings
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Iterate through active providers + settings
-            ForEach(settings.activeProviders + [settings.allBuiltInProviders.first(where: { $0.id == AIService.settings.rawValue })!]) {
+            // Iterate through active web providers
+            ForEach(settings.activeProviders.filter { $0.url != nil }) {
                 provider in
                 Button(action: {
-                    // Find the corresponding AIService for the selected provider
-                    if let selectedAIService = AIService.allCases.first(where: { $0.rawValue == provider.id }) {
-                        selectedService = selectedAIService
-                    } else if provider.id == AIService.settings.rawValue { // Handle settings case for custom providers
-                         selectedService = .settings
-                    }
-                    // If it's a custom provider, we might need a different way to handle selection if AIService enum is not updated dynamically.
-                    // For now, assuming selection will primarily be from AIService cases or settings.
+                    selectedProvider = provider // Set the selected provider directly
                     dismiss()
                 }) {
                     HStack {
@@ -65,14 +58,14 @@ struct ServiceDropdownView: View {
                                 .aspectRatio(contentMode: .fit)
                                 .frame(width: 20, height: 20)
                         } else if provider.isSystemImage {
-                            // Use systemName for SF Symbols (like settings)
-                            Image(systemName: provider.iconName)
+                            // Use systemName for SF Symbols (should not happen for web providers)
+                             Image(systemName: provider.iconName)
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
                                 .frame(width: 20, height: 20)
                         } else {
-                            // Use asset catalog for other built-in icons or a placeholder for custom ones if favicon fails
-                            Image(provider.iconName)
+                            // Use asset catalog or placeholder
+                            Image(provider.iconName) // Assuming iconName is a valid asset or placeholder
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
                                 .frame(width: 20, height: 20)
@@ -93,7 +86,7 @@ struct ServiceDropdownView: View {
                 .buttonStyle(.plain) // Remove default button styling
                 .padding(.vertical, 8)
                 .padding(.horizontal, 12)
-                .background(selectedService.id == provider.id ? Color.accentColor.opacity(0.2) : Color.clear) // Compare IDs
+                .background(selectedProvider?.id == provider.id ? Color.accentColor.opacity(0.2) : Color.clear) // Compare IDs
                 .cornerRadius(4)
                 .onAppear {
                     // Fetch favicon when the provider appears in the list
@@ -104,6 +97,29 @@ struct ServiceDropdownView: View {
                         }
                     }
                 }
+            }
+            
+            // Add Settings option separately at the end
+            if let settingsProvider = settings.allBuiltInProviders.first(where: { $0.id == AIService.settings.rawValue }) {
+                Button(action: {
+                    selectedProvider = settingsProvider
+                    dismiss()
+                }) {
+                    HStack {
+                        Image(systemName: settingsProvider.iconName)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 20, height: 20)
+                        Text(settingsProvider.name)
+                        Spacer()
+                    }
+                    .contentShape(Rectangle()) // Make the entire row tappable
+                }
+                .buttonStyle(.plain)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .background(selectedProvider?.id == settingsProvider.id ? Color.accentColor.opacity(0.2) : Color.clear)
+                .cornerRadius(4)
             }
         }
         .padding(8) // Inner padding
@@ -116,7 +132,7 @@ struct ServiceDropdownView: View {
 // Custom view for the title bar
 struct CustomTitleBar: View {
     let window: NSWindow? // Add a property to hold the window reference
-    @Binding var selectedService: AIService // Binding to the selected service
+    @Binding var selectedProvider: ChatProvider? // Change to ChatProvider?
     @ObservedObject var settings: AppSettings // Observe AppSettings
     @State private var showingDropdown = false // State to control dropdown visibility
     @State private var isHoveringButton = false // Track if the button is hovered
@@ -140,21 +156,24 @@ struct CustomTitleBar: View {
                 closeDropdownWorkItem?.cancel()
 
             }) {
-                // Use Image(systemName:) for the settings icon, otherwise use Image(_:)
-                // Use selectedService to determine which icon to show in the title bar button
-                if selectedService == .settings {
-                    Image(systemName: selectedService.iconName) // Use systemName for SF Symbols
-                        .resizable()
-                        .frame(width: 20, height: 20)
-                } else if let provider = settings.activeProviders.first(where: { $0.id == selectedService.id }), let favicon = settings.faviconImage(for: provider) {
-                    // Display favicon in title bar if available for the selected service
-                    favicon
-                         .resizable()
-                         .aspectRatio(contentMode: .fit)
-                         .frame(width: 20, height: 20)
-                } else {
-                    // Fallback to asset catalog for other built-in icons if no favicon
-                    Image(selectedService.iconName)
+                // Display icon for the selected provider
+                if let provider = selectedProvider {
+                    if let favicon = settings.faviconImage(for: provider) {
+                        favicon
+                             .resizable()
+                             .aspectRatio(contentMode: .fit)
+                             .frame(width: 20, height: 20)
+                    } else if provider.isSystemImage {
+                         Image(systemName: provider.iconName)
+                              .resizable()
+                              .frame(width: 20, height: 20)
+                    } else {
+                         Image(provider.iconName)
+                              .resizable()
+                              .frame(width: 20, height: 20)
+                    }
+                } else { // Fallback if no provider is selected
+                    Image(systemName: "questionmark.circle")
                         .resizable()
                         .frame(width: 20, height: 20)
                 }
@@ -172,7 +191,7 @@ struct CustomTitleBar: View {
                 }
             }
             .popover(isPresented: $showingDropdown, arrowEdge: .top) {
-                ServiceDropdownView(selectedService: $selectedService, dismiss: { // Pass selectedService binding
+                ServiceDropdownView(selectedProvider: $selectedProvider, dismiss: { // Pass selectedProvider binding
                     // Dismiss dropdown when an item is selected
                     showingDropdown = false
                     closeDropdownWorkItem?.cancel()
@@ -245,24 +264,24 @@ struct ContentView: View {
     @ObservedObject var windowManager: WindowManager // Observe the window manager
     @ObservedObject var settings = AppSettings.shared // Observe AppSettings
 
-    @State private var selectedService: AIService = .chatgpt // State to hold the selected service
+    @State private var selectedProvider: ChatProvider? // Change to ChatProvider?
 
     var body: some View {
         // Use a Group to conditionally display content
         VStack(spacing: 0) { // Use a VStack with no spacing for the main content area
             // Always display the custom title bar
-            CustomTitleBar(window: window, selectedService: $selectedService, settings: settings) // Add our custom title bar and pass settings
+            CustomTitleBar(window: window, selectedProvider: $selectedProvider, settings: settings) // Pass selectedProvider binding and settings
             
             // Switch the main content based on the current view state
             Group { // Use a Group to conditionally display content below the title bar
                 switch windowManager.currentView {
                 case .webView:
                     // Display the WebView when in webView state
-                    // Safely unwrap the URL for the selected provider
-                    if let provider = settings.activeProviders.first(where: { $0.id == selectedService.id }), let url = provider.url {
+                    // Use the URL from the selectedProvider
+                    if let provider = selectedProvider, let url = provider.url {
                         WebView(url: url)
                     } else {
-                        // This case might happen if a selected provider is removed or becomes inactive
+                        // Handle case where no provider is selected or selected provider has no URL
                          Color.clear // Or some placeholder view
                     }
 
@@ -276,13 +295,13 @@ struct ContentView: View {
 //            .background(.thinMaterial) // Example: Apply background here if not on ContentView
 //            .padding() // Example: Apply padding here if not on ContentView
         }
-        // Observe changes to selectedService (triggered by dropdown) and update WebView
-        .onChange(of: selectedService) { newValue in // Use newValue
-            // If the selected service is settings, switch to settings view
-            if newValue == .settings {
+        // Observe changes to selectedProvider and update view state
+        .onChange(of: selectedProvider) { newValue in // Use newValue
+            // If the selected provider is the settings provider, switch to settings view
+            if newValue?.id == AIService.settings.rawValue {
                 windowManager.showSettingsView()
             } else {
-                // Otherwise, ensure we are in web view state and the web view will update due to binding
+                // Otherwise, ensure we are in web view state
                 windowManager.showWebView()
             }
         }
@@ -292,6 +311,14 @@ struct ContentView: View {
                  window.reloadAction = { self.reloadWebView() }
                  window.nextServiceAction = { self.selectNextService() }
              }
+             // Initialize selectedProvider to the first active provider or settings if no active web providers
+             if selectedProvider == nil {
+                 if let firstActiveWebProvider = settings.activeProviders.first(where: { $0.url != nil }) {
+                      selectedProvider = firstActiveWebProvider
+                 } else if let settingsProvider = settings.allBuiltInProviders.first(where: { $0.id == AIService.settings.rawValue }) {
+                      selectedProvider = settingsProvider
+                 }
+            }
         }
     }
     
@@ -302,45 +329,12 @@ struct ContentView: View {
         guard !activeProviders.isEmpty else { return } // Do nothing if no active providers
         
         // Find the currently selected provider in the active list
-        if let currentIndex = activeProviders.firstIndex(where: { $0.id == selectedService.id }) {
+        if let currentProvider = selectedProvider, let currentIndex = activeProviders.firstIndex(where: { $0.id == currentProvider.id }) {
             let nextIndex = (currentIndex + 1) % activeProviders.count
-            // Update selectedService based on the next provider's ID
-            if let nextAIService = AIService.allCases.first(where: { $0.rawValue == activeProviders[nextIndex].id }) {
-                 selectedService = nextAIService
-            } else { // Handle the case where the next active provider is a custom one not in AIService enum
-                 // You might want to handle this differently, e.g., keep track of selected provider by ID directly
-                 // For now, we'll stick to AIService for selectedService state.
-                 // A more robust solution would be to store selected provider ID and use it to find the provider in settings.activeProviders
-                 print("Could not find matching AIService for next provider ID: \(activeProviders[nextIndex].id)")
-                 // As a fallback, maybe select the first active built-in provider or settings
-                 if let firstBuiltIn = settings.allBuiltInProviders.first(where: { settings.activeProviderIds.contains($0.id) && $0.url != nil }) {
-                      if let firstAIService = AIService.allCases.first(where: { $0.rawValue == firstBuiltIn.id }) {
-                           selectedService = firstAIService
-                      }
-                 } else if settings.activeProviderIds.contains(AIService.settings.rawValue) {
-                      selectedService = .settings
-                 }
-            }
-        } else { // If current selectedService is not in the active list (e.g., was deactivated)
+            selectedProvider = activeProviders[nextIndex]
+        } else { // If no provider is currently selected or selected provider is not in the active list
             // Select the first active provider (if any)
-            if let firstActiveProvider = activeProviders.first {
-                 if let firstAIService = AIService.allCases.first(where: { $0.rawValue == firstActiveProvider.id }) {
-                      selectedService = firstAIService
-                 } else if firstActiveProvider.id == AIService.settings.rawValue {
-                      selectedService = .settings
-                 } else { // Handle custom provider as the first active one
-                      // Again, a more robust solution needed for custom providers in selectedService state
-                      print("First active provider is a custom one, cannot set selectedService directly.")
-                      // Fallback similar to above
-                       if let firstBuiltIn = settings.allBuiltInProviders.first(where: { settings.activeProviderIds.contains($0.id) && $0.url != nil }) {
-                            if let firstAIService = AIService.allCases.first(where: { $0.rawValue == firstBuiltIn.id }) {
-                                 selectedService = firstAIService
-                            }
-                       } else if settings.activeProviderIds.contains(AIService.settings.rawValue) {
-                            selectedService = .settings
-                       }
-                 }
-            }
+            selectedProvider = activeProviders.first
         }
     }
     
