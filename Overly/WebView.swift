@@ -1,12 +1,18 @@
 import SwiftUI
 import WebKit
+import AppKit // Import AppKit for NSWorkspace
 
 struct WebView: NSViewRepresentable {
     let url: URL
 
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
     func makeNSView(context: Context) -> WKWebView {
         print("WebView: makeNSView called with URL: \(url)")
         let webView = WKWebView()
+        webView.navigationDelegate = context.coordinator // Set the coordinator as the navigation delegate
         // Perform an initial load when the view is created
         let request = URLRequest(url: url)
         webView.load(request)
@@ -18,6 +24,33 @@ struct WebView: NSViewRepresentable {
         // Load the new URL when the url property changes
         let request = URLRequest(url: url)
         nsView.load(request)
+    }
+
+    // Coordinator to act as the WKNavigationDelegate
+    class Coordinator: NSObject, WKNavigationDelegate {
+        var parent: WebView
+
+        init(_ parent: WebView) {
+            self.parent = parent
+        }
+
+        // Decide policy for navigation
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            // Check if the navigation is a link click and not the main frame (to avoid opening redirects in external browser)
+            if navigationAction.navigationType == .linkActivated && navigationAction.targetFrame == nil {
+                 // Open the URL in the default browser
+                 if let url = navigationAction.request.url {
+                     NSWorkspace.shared.open(url)
+                     // Hide the application window
+                     NSApplication.shared.mainWindow?.orderOut(nil)
+                 }
+                 // Cancel the navigation within the WebView
+                 decisionHandler(.cancel)
+            } else {
+                 // Allow other types of navigation within the WebView
+                 decisionHandler(.allow)
+            }
+        }
     }
 }
 
