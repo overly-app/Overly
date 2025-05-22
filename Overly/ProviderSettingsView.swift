@@ -11,6 +11,8 @@ import SwiftUI
 struct ProviderRowView: View {
     @ObservedObject var settings: AppSettings // Observe AppSettings
     let provider: ChatProvider
+    @State private var isRenaming: Bool = false // State to track if renaming is active
+    @State private var newProviderName: String = "" // State to hold the new name
 
     var body: some View {
         HStack {
@@ -42,7 +44,30 @@ struct ProviderRowView: View {
                 }
             }
 
-            Text(provider.name)
+            // Show TextField for renaming if in renaming mode and is a custom provider
+            if isRenaming && settings.customProviders.contains(where: { $0.id == provider.id }) {
+                TextField("Provider Name", text: $newProviderName, onCommit: {
+                    // Update the name when editing finishes (e.g., Enter key)
+                    settings.updateCustomProviderName(id: provider.id, newName: newProviderName)
+                    isRenaming = false // Exit renaming mode
+                })
+                .textFieldStyle(.roundedBorder) // Optional: Add a style
+                .onAppear {
+                    // Initialize the TextField with the current name
+                    newProviderName = provider.name
+                }
+            } else {
+                // Otherwise, show the Text view
+                Text(provider.name)
+                    // Add double-tap gesture for renaming on custom providers
+                    .contentShape(Rectangle()) // Make the whole area tappable
+                    .onTapGesture(count: 2) {
+                        if settings.customProviders.contains(where: { $0.id == provider.id }) {
+                            isRenaming = true // Enter renaming mode on double-tap
+                            newProviderName = provider.name // Pre-fill the TextField
+                        }
+                    }
+            }
 
             Spacer()
 

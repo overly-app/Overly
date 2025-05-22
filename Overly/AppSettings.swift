@@ -3,7 +3,7 @@ import Foundation
 
 struct ChatProvider: Identifiable, Codable, Equatable {
     let id: String
-    let name: String
+    var name: String
     let url: URL?
     let iconName: String
     let isSystemImage: Bool
@@ -112,6 +112,14 @@ class AppSettings: ObservableObject {
             activeProviderIds.insert(id)
         }
         saveProviders()
+    }
+    
+    // Method to update the name of a custom provider
+    func updateCustomProviderName(id: String, newName: String) {
+        if let index = customProviders.firstIndex(where: { $0.id == id }) {
+            customProviders[index].name = newName
+            saveProviders()
+        }
     }
     
     // Method to save a favicon image data for a provider
