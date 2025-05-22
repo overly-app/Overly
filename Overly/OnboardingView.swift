@@ -19,43 +19,57 @@ struct OnboardingView: View {
     @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
     @Environment(\.colorScheme) var colorScheme
 
+    // State variable to control showing the service selection view
+    @State private var showServiceSelection = false
+
     var body: some View {
-        VStack {
-            Spacer()
+        ZStack { // Use ZStack to layer the views
+            VStack {
+                Spacer()
 
-            // Welcome Text
-            Text("Welcome to Overly")
-                .font(.largeTitle)
-                .padding()
+                // Welcome Text
+                Text("Welcome to Overly")
+                    .font(.largeTitle)
+                    .padding()
 
-            // App Icon (Using the new asset name 'AppIconOnboarding')
-            // The scaling will be handled by aspectRatio and frame
-            Image("AppIconOnboarding")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 200, height: 200)
-                .padding()
+                // App Icon (Using the new asset name 'AppIconOnboarding')
+                Image("AppIconOnboarding")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 200, height: 200)
+                    .padding()
 
-            Spacer()
+                Spacer()
 
-            // Debug text to verify view hierarchy
-
-            // Continue Button
-            Button(action: {
-                hasCompletedOnboarding = true
-            }) {
-                HStack(spacing: 8) {
-                    Text("Continue")
-                    Image(systemName: "arrow.right")
+                // Continue Button
+                Button(action: {
+                    // Show the service selection view
+                    withAnimation { // Animate the state change
+                        showServiceSelection = true
+                    }
+                }) {
+                    HStack(spacing: 8) {
+                        Text("Continue")
+                        Image(systemName: "arrow.right")
+                    }
                 }
+                .buttonStyle(OnboardingButtonStyle())
+
+                Spacer()
             }
-            .buttonStyle(OnboardingButtonStyle())
+            .padding()
+            .frame(width: 700, height: 400)
+            .opacity(showServiceSelection ? 0 : 1) // Fade out onboarding when showing service selection
 
-
-            Spacer()
+            if showServiceSelection {
+                ServiceSelectionView(onCompletion: {
+                    withAnimation { // Animate the state change
+                        hasCompletedOnboarding = true // Mark onboarding complete
+                    }
+                })
+                .transition(.move(edge: .trailing).combined(with: .opacity)) // Slide and fade in from trailing edge
+            }
         }
-        .padding()
-        .frame(width: 700, height: 400)
     }
 }
 
