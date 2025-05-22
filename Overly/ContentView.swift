@@ -12,6 +12,9 @@ enum AIService: String, CaseIterable, Identifiable {
     case chatgpt = "ChatGPT"
     case gemini = "Gemini"
     case poe = "Poe"
+    case perplexity = "Perplexity"
+    case copilot = "Copilot"
+    case claude = "Claude"
     case settings = "Settings"
 
     var id: String { self.rawValue }
@@ -21,6 +24,9 @@ enum AIService: String, CaseIterable, Identifiable {
         case .chatgpt: return URL(string: "https://chatgpt.com")!
         case .gemini: return URL(string: "https://gemini.google.com")!
         case .poe: return URL(string: "https://poe.com")!
+        case .perplexity: return URL(string: "https://perplexity.ai")!
+        case .copilot: return URL(string: "https://copilot.microsoft.com")!
+        case .claude: return URL(string: "https://claude.ai")!
         case .settings: return nil
         }
     }
@@ -30,6 +36,9 @@ enum AIService: String, CaseIterable, Identifiable {
         case .chatgpt: return "openai" // Use the actual asset name
         case .gemini: return "gemini" // Use the actual asset name
         case .poe: return "poe" // Use the actual asset name
+        case .perplexity: return "link" // Using system icon for now
+        case .copilot: return "link" // Using system icon for now
+        case .claude: return "link" // Using system icon for now
         case .settings: return "gearshape"
         }
     }
