@@ -58,7 +58,7 @@ struct OnboardingView: View {
                 Spacer()
             }
             .padding()
-            .frame(width: 700, height: 400)
+            .frame(width: 800, height: 500)
             .opacity(showServiceSelection ? 0 : 1) // Fade out onboarding when showing service selection
 
             if showServiceSelection {
