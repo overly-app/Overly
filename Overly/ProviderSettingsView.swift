@@ -7,92 +7,119 @@
 
 import SwiftUI
 
-// Extracted view for a single provider row
-struct ProviderRowView: View {
-    @ObservedObject var settings: AppSettings // Observe AppSettings
+// Custom view for the provider chip design (same as ServiceSelectionView)
+struct ProviderChipViewSettings: View {
+    @Environment(\.colorScheme) var colorScheme
     let provider: ChatProvider
-    @State private var isRenaming: Bool = false // State to track if renaming is active
-    @State private var newProviderName: String = "" // State to hold the new name
+    @ObservedObject var settings: AppSettings
+    let onDelete: (String) -> Void
+    @State private var isRenaming: Bool = false
+    @State private var newProviderName: String = ""
+
+    var isSelected: Bool {
+        settings.activeProviderIds.contains(provider.id)
+    }
 
     var body: some View {
-        HStack {
-            // Display icon: Try favicon, then system image, then asset
-            Group {
-                if let favicon = settings.faviconImage(for: provider) {
-                    favicon
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 20, height: 20)
-                } else if provider.isSystemImage {
-                    Image(systemName: provider.iconName)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 20, height: 20)
-                } else {
-                    Image(provider.iconName) // Assuming iconName is a valid asset or placeholder
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 20, height: 20)
-                }
+        Button(action: {
+            if provider.url != nil { // Only toggle for web providers
+                settings.toggleActiveProvider(id: provider.id)
             }
-            .onAppear {
-                // Attempt to fetch favicon if it's a web provider without a cached icon
-                if provider.url != nil && settings.faviconCache[provider.id] == nil {
-                    Task {
-                        await settings.fetchFavicon(for: provider)
+        }) {
+            HStack {
+                ServiceIconViewSettings(provider: provider, settings: settings)
+                
+                // Show TextField for renaming if in renaming mode and is a custom provider
+                if isRenaming && settings.customProviders.contains(where: { $0.id == provider.id }) {
+                    TextField("Provider Name", text: $newProviderName, onCommit: {
+                        settings.updateCustomProviderName(id: provider.id, newName: newProviderName)
+                        isRenaming = false
+                    })
+                    .textFieldStyle(.plain)
+                    .foregroundColor(isSelected ? (colorScheme == .dark ? .black : .white) : .primary)
+                    .fontWeight(isSelected ? .bold : .regular)
+                    .onAppear {
+                        newProviderName = provider.name
                     }
+                } else {
+                    Text(provider.name)
+                        .foregroundColor(isSelected ? (colorScheme == .dark ? .black : .white) : .primary)
+                        .fontWeight(isSelected ? .bold : .regular)
+                        .onTapGesture(count: 2) {
+                            if settings.customProviders.contains(where: { $0.id == provider.id }) {
+                                isRenaming = true
+                                newProviderName = provider.name
+                            }
+                        }
+                }
+
+                // Add remove button for custom providers
+                if settings.customProviders.contains(where: { $0.id == provider.id }) {
+                    Button(action: {
+                        onDelete(provider.id)
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.gray)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-
-            // Show TextField for renaming if in renaming mode and is a custom provider
-            if isRenaming && settings.customProviders.contains(where: { $0.id == provider.id }) {
-                TextField("Provider Name", text: $newProviderName, onCommit: {
-                    // Update the name when editing finishes (e.g., Enter key)
-                    settings.updateCustomProviderName(id: provider.id, newName: newProviderName)
-                    isRenaming = false // Exit renaming mode
-                })
-                .textFieldStyle(.roundedBorder) // Optional: Add a style
-                .onAppear {
-                    // Initialize the TextField with the current name
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(isSelected ? (colorScheme == .dark ? .white : .black) : (colorScheme == .dark ? Color.gray.opacity(0.2) : Color.gray.opacity(0.1)))
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(isSelected ? (colorScheme == .dark ? .white : .black) : .clear, lineWidth: isSelected ? 2 : 1)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            if settings.customProviders.contains(where: { $0.id == provider.id }) {
+                Button("Delete", role: .destructive) {
+                    onDelete(provider.id)
+                }
+                Button("Rename") {
+                    isRenaming = true
                     newProviderName = provider.name
                 }
-            } else {
-                // Otherwise, show the Text view
-                Text(provider.name)
-                    // Add double-tap gesture for renaming on custom providers
-                    .contentShape(Rectangle()) // Make the whole area tappable
-                    .onTapGesture(count: 2) {
-                        if settings.customProviders.contains(where: { $0.id == provider.id }) {
-                            isRenaming = true // Enter renaming mode on double-tap
-                            newProviderName = provider.name // Pre-fill the TextField
-                        }
-                    }
-            }
-
-            Spacer()
-
-            if provider.url != nil { // Only show toggle for web providers
-                Toggle("Active", isOn: Binding(get: {
-                    settings.activeProviderIds.contains(provider.id)
-                }, set: {
-                    isActive in
-                    settings.toggleActiveProvider(id: provider.id)
-                }))
-                .labelsHidden()
-            }
-
-            // Option to remove custom providers
-            if settings.customProviders.contains(where: { $0.id == provider.id }) {
-                Button(action: {
-                    settings.removeCustomProvider(id: provider.id)
-                }) {
-                    Image(systemName: "minus.circle")
-                        .foregroundColor(.red)
-                }
-                .buttonStyle(.plain)
             }
         }
-        .padding(.vertical, 2)
+    }
+}
+
+// Helper view to display service icons (same as ServiceSelectionView)
+struct ServiceIconViewSettings: View {
+    let provider: ChatProvider
+    @ObservedObject var settings: AppSettings
+    
+    var body: some View {
+        Group {
+            if let favicon = settings.faviconImage(for: provider) {
+                favicon
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 20, height: 20)
+            } else if provider.isSystemImage {
+                 Image(systemName: provider.iconName)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 20, height: 20)
+            } else {
+                 Image(provider.iconName)
+                     .resizable()
+                     .aspectRatio(contentMode: .fit)
+                     .frame(width: 20, height: 20)
+                     .onAppear {
+                         if provider.url != nil && settings.faviconCache[provider.id] == nil && settings.customProviders.contains(where: { $0.id == provider.id }) {
+                             Task {
+                                 await settings.fetchFavicon(for: provider)
+                             }
+                         }
+                     }
+            }
+        }
     }
 }
 
@@ -106,92 +133,120 @@ struct AddProviderView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Add Custom Provider")
                 .font(.headline)
+                .padding(.leading)
 
-            TextField("Name", text: $newProviderName)
-            TextField("URL", text: $newProviderURLString)
+            HStack {
+                TextField("Provider Name", text: $newProviderName)
+                    .textFieldStyle(.roundedBorder)
+                TextField("Provider URL", text: $newProviderURLString)
+                    .textFieldStyle(.roundedBorder)
+                Button("Add") {
+                    if !newProviderName.isEmpty && !newProviderURLString.isEmpty {
+                        var urlString = newProviderURLString
+                        if !urlString.contains("://") {
+                            urlString = "https://" + urlString
+                        }
 
-            Button("Add Provider") {
-                if !newProviderName.isEmpty && !newProviderURLString.isEmpty {
-                    var urlString = newProviderURLString
-                    // Prepend https:// if no scheme is present
-                    if !urlString.lowercased().hasPrefix("http://") && !urlString.lowercased().hasPrefix("https://") {
-                        urlString = "https://" + urlString
-                    }
+                        if let url = URL(string: urlString) {
+                            let newProvider = ChatProvider(
+                                id: UUID().uuidString,
+                                name: newProviderName,
+                                url: url,
+                                iconName: "link",
+                                isSystemImage: true
+                            )
+                            settings.addCustomProvider(newProvider)
+                            
+                            Task {
+                                await settings.fetchFavicon(for: newProvider)
+                            }
 
-                    if let url = URL(string: urlString) {
-                        let newProvider = ChatProvider(
-                            id: UUID().uuidString, // Unique ID for custom providers
-                            name: newProviderName,
-                            url: url,
-                            iconName: "link", // Default placeholder icon
-                            isSystemImage: true // Use system image for placeholder
-                        )
-                        settings.addCustomProvider(newProvider)
-                        // Attempt to fetch favicon immediately after adding
-                        Task {
-                             await settings.fetchFavicon(for: newProvider)
-                         }
-                        // Clear input fields
-                        newProviderName = ""
-                        newProviderURLString = ""
-                    } else {
-                         // Optionally, show an alert to the user that the URL is invalid
-                         print("Invalid URL entered: \(newProviderURLString)")
+                            newProviderName = ""
+                            newProviderURLString = ""
+                        }
                     }
                 }
+                .buttonStyle(.bordered)
             }
-            .disabled(newProviderName.isEmpty || newProviderURLString.isEmpty)
+            .padding(.horizontal)
         }
     }
 }
 
 struct ProviderSettingsView: View {
-     @ObservedObject var settings = AppSettings.shared // Use the shared settings instance
+     @ObservedObject var settings = AppSettings.shared
 
      @State private var newProviderName: String = ""
      @State private var newProviderURLString: String = ""
-
-     // Computed property for the list of all providers to simplify the ForEach
-     private var allProviders: [ChatProvider] {
-         settings.allBuiltInProviders + settings.customProviders
-     }
 
      var body: some View {
          VStack(alignment: .leading, spacing: 20) {
              Text("Provider Settings")
                  .font(.largeTitle)
+                 .padding(.top)
 
-             // Section for managing providers
-             ScrollView {
-                 VStack(alignment: .leading, spacing: 10) {
-                     Text("Manage Providers")
-                         .font(.headline)
+             // Section for Built-in Providers
+             VStack(alignment: .leading) {
+                 Text("Built-in Providers")
+                     .font(.headline)
+                     .padding(.leading)
 
-                     // List of all providers (built-in and custom)
-                     ForEach(allProviders) {
-                         provider in
-                         ProviderRowView(settings: settings, provider: provider) // Use the extracted view
+                 ScrollView(.horizontal, showsIndicators: false) {
+                     HStack {
+                         ForEach(settings.allBuiltInProviders.filter { $0.url != nil }) { provider in
+                             ProviderChipViewSettings(provider: provider, settings: settings, onDelete: deleteCustomProvider)
+                         }
                      }
+                     .padding(.horizontal)
                  }
+                 .frame(height: 60)
              }
+
+             Divider()
+                 .padding(.vertical, 20)
+
+             // Section for Custom Providers
+             VStack(alignment: .leading) {
+                 Text("Custom Providers")
+                     .font(.headline)
+                     .padding(.leading)
+
+                 ScrollView(.horizontal, showsIndicators: false) {
+                     HStack {
+                         ForEach(settings.customProviders) { provider in
+                             ProviderChipViewSettings(provider: provider, settings: settings, onDelete: deleteCustomProvider)
+                         }
+                     }
+                     .padding(.horizontal)
+                 }
+                 .frame(height: 60)
+             }
+             .padding(.bottom)
 
              Divider()
 
              // Section for adding custom providers
-             AddProviderView(settings: settings, newProviderName: $newProviderName, newProviderURLString: $newProviderURLString) // Use the extracted view
+             AddProviderView(settings: settings, newProviderName: $newProviderName, newProviderURLString: $newProviderURLString)
 
              Spacer()
          }
          .padding()
-         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading) // Align content to top leading
+         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
          .onAppear {
-             // Pre-fetch favicons for active built-in providers when settings appear
              for provider in settings.allBuiltInProviders where settings.activeProviderIds.contains(provider.id) && provider.url != nil && settings.faviconCache[provider.id] == nil {
                   Task {
                        await settings.fetchFavicon(for: provider)
                    }
              }
          }
+     }
+     
+     // Function to handle deleting custom providers by ID
+     func deleteCustomProvider(id: String) {
+         settings.customProviders.removeAll { $0.id == id }
+         settings.activeProviderIds.remove(id)
+         settings.faviconCache.removeValue(forKey: id)
+         settings.saveSettings()
      }
 }
 
