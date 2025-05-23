@@ -15,6 +15,7 @@ enum AIService: String, CaseIterable, Identifiable {
     case perplexity = "Perplexity"
     case copilot = "Copilot"
     case claude = "Claude"
+    case t3chat = "T3 Chat"
     case settings = "Settings"
 
     var id: String { self.rawValue }
@@ -27,6 +28,7 @@ enum AIService: String, CaseIterable, Identifiable {
         case .perplexity: return URL(string: "https://perplexity.ai")!
         case .copilot: return URL(string: "https://copilot.microsoft.com")!
         case .claude: return URL(string: "https://claude.ai")!
+        case .t3chat: return URL(string: "https://t3.chat")!
         case .settings: return nil
         }
     }
@@ -39,6 +41,7 @@ enum AIService: String, CaseIterable, Identifiable {
         case .perplexity: return "link" // Using system icon for now
         case .copilot: return "link" // Using system icon for now
         case .claude: return "link" // Using system icon for now
+        case .t3chat: return "link" // Using system icon for now
         case .settings: return "gearshape"
         }
     }
@@ -332,6 +335,13 @@ struct ContentView: View {
                      } else if let settingsProvider = settings.allBuiltInProviders.first(where: { $0.id == AIService.settings.rawValue }) {
                           selectedProvider = settingsProvider
                      }
+                }
+                
+                // Fetch favicons for active built-in providers on app launch
+                for provider in settings.allBuiltInProviders where settings.activeProviderIds.contains(provider.id) && provider.url != nil && settings.faviconCache[provider.id] == nil {
+                     Task {
+                          await settings.fetchFavicon(for: provider)
+                      }
                 }
             }
         } else {

@@ -65,6 +65,13 @@ struct ProviderChipView: View {
                 }
             }
         }
+        .onAppear { // Add onAppear to fetch favicon when the view appears
+            if provider.url != nil && settings.faviconCache[provider.id] == nil {
+                Task {
+                    await settings.fetchFavicon(for: provider)
+                }
+            }
+        }
     }
 }
 
