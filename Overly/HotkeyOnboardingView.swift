@@ -142,6 +142,7 @@ struct HotkeyOnboardingView: View {
                         Image(systemName: "arrow.right")
                             .font(.system(size: 12, weight: .medium))
                     }
+                    
                     .foregroundColor(.white)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
