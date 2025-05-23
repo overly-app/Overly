@@ -45,7 +45,7 @@ struct HotkeyOnboardingView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 
                 // Subtitle
-                Text("We've made the transition to Overly as smooth as possible to set you up for success.")
+                Text("Get started with Overly and discover a seamless way to manage your workflow.")
                     .font(.system(size: 16, weight: .regular))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.leading)
@@ -61,8 +61,8 @@ struct HotkeyOnboardingView: View {
                 // Large hotkey display
                 HStack(spacing: 12) {
                     // Show current modifiers (either currently pressed or saved)
-                    let displayModifiers = currentlyPressedModifiers.isEmpty ? settings.toggleHotkeyModifiers : currentlyPressedModifiers
-                    let displayKey = currentlyPressedKey ?? settings.toggleHotkeyKey
+                    let displayModifiers = (isRecordingHotkey && !currentlyPressedModifiers.isEmpty) ? currentlyPressedModifiers : settings.toggleHotkeyModifiers
+                    let displayKey = (isRecordingHotkey && currentlyPressedKey != nil) ? currentlyPressedKey! : settings.toggleHotkeyKey
                     
                     ForEach(modifierFlagsArray(from: displayModifiers), id: \.rawValue) { modifier in
                         Text(modifierSymbol(for: modifier))
@@ -149,7 +149,6 @@ struct HotkeyOnboardingView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .buttonStyle(.plain)
-                .disabled(settings.toggleHotkeyKey == .j && settings.toggleHotkeyModifiers == [.command])
             }
             .padding(.horizontal, 40)
             .padding(.bottom, 40)
