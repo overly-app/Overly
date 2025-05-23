@@ -27,10 +27,7 @@ struct HotkeyOnboardingView: View {
                 
                 // Main title
                 VStack(spacing: 8) {
-                    Text("Keep your")
-                        .font(.system(size: 48, weight: .bold, design: .default))
-                        .foregroundColor(.primary)
-                    Text("muscle memory")
+                    Text("Set Up your Hotkey")
                         .font(.system(size: 48, weight: .bold, design: .default))
                         .foregroundColor(.primary)
                 }
