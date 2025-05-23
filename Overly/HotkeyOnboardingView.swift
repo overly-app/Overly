@@ -7,6 +7,16 @@ struct HotkeyOnboardingView: View {
     @ObservedObject var settings = AppSettings.shared
     var onCompletion: () -> Void // Add completion closure
     @State private var isRecordingHotkey = false // State to control recording
+    
+    // Real-time key monitoring states
+    @State private var currentlyPressedModifiers: NSEvent.ModifierFlags = []
+    @State private var currentlyPressedKey: Key? = nil
+    @State private var keyMonitor: Any? = nil
+    @State private var flagsMonitor: Any? = nil
+    @State private var localKeyMonitor: Any? = nil
+    @State private var localFlagsMonitor: Any? = nil
+    @State private var keyUpMonitor: Any? = nil
+    @State private var localKeyUpMonitor: Any? = nil
 
     var body: some View {
         VStack(spacing: 40) {
@@ -50,8 +60,11 @@ struct HotkeyOnboardingView: View {
             VStack(spacing: 24) {
                 // Large hotkey display
                 HStack(spacing: 12) {
-                    // Show current modifiers
-                    ForEach(modifierFlagsArray(from: settings.toggleHotkeyModifiers), id: \.rawValue) { modifier in
+                    // Show current modifiers (either currently pressed or saved)
+                    let displayModifiers = currentlyPressedModifiers.isEmpty ? settings.toggleHotkeyModifiers : currentlyPressedModifiers
+                    let displayKey = currentlyPressedKey ?? settings.toggleHotkeyKey
+                    
+                    ForEach(modifierFlagsArray(from: displayModifiers), id: \.rawValue) { modifier in
                         Text(modifierSymbol(for: modifier))
                             .font(.system(size: 24, weight: .medium))
                             .foregroundColor(.white)
@@ -59,21 +72,21 @@ struct HotkeyOnboardingView: View {
                             .background(Color.black.opacity(0.8))
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         
-                        if modifier.rawValue != modifierFlagsArray(from: settings.toggleHotkeyModifiers).last?.rawValue {
+                        if modifier.rawValue != modifierFlagsArray(from: displayModifiers).last?.rawValue {
                             Text("+")
                                 .font(.system(size: 20, weight: .medium))
                                 .foregroundColor(.secondary)
                         }
                     }
                     
-                    if !settings.toggleHotkeyModifiers.isEmpty {
+                    if !displayModifiers.isEmpty {
                         Text("+")
                             .font(.system(size: 20, weight: .medium))
                             .foregroundColor(.secondary)
                     }
                     
-                    // Show current key
-                    Text(keyDisplayName(for: settings.toggleHotkeyKey))
+                    // Show current key (either currently pressed or saved)
+                    Text(keyDisplayName(for: displayKey))
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white)
                         .frame(minWidth: 80)
@@ -85,6 +98,8 @@ struct HotkeyOnboardingView: View {
                 // Record button
                 Button(action: {
                     isRecordingHotkey = true
+                    // Disable global hotkey when starting to record
+                    disableGlobalHotkey()
                 }) {
                     Text(isRecordingHotkey ? "Recording..." : "Record New Hotkey")
                         .font(.system(size: 14, weight: .medium))
@@ -108,6 +123,12 @@ struct HotkeyOnboardingView: View {
             )
             .frame(width: 0, height: 0)
             .opacity(0)
+            .onChange(of: isRecordingHotkey) { newValue in
+                if !newValue {
+                    // Re-enable global hotkey when recording stops
+                    enableGlobalHotkey()
+                }
+            }
             
             // Continue button at bottom
             HStack {
@@ -135,7 +156,114 @@ struct HotkeyOnboardingView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(NSColor.windowBackgroundColor))
+        .onAppear {
+            setupKeyMonitoring()
+            disableGlobalHotkey()
+        }
+        .onDisappear {
+            cleanupKeyMonitoring()
+            enableGlobalHotkey()
+        }
     }
+    
+    // MARK: - Key Monitoring Methods
+    
+    private func setupKeyMonitoring() {
+        // Monitor modifier flags changes
+        flagsMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { event in
+            DispatchQueue.main.async {
+                let newModifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+                self.currentlyPressedModifiers = newModifiers
+            }
+        }
+        
+        // Monitor key down events
+        keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { event in
+            DispatchQueue.main.async {
+                if let key = Key(carbonKeyCode: UInt32(event.keyCode)) {
+                    self.currentlyPressedKey = key
+                }
+            }
+        }
+        
+        // Monitor key up events to clear the currently pressed key
+        keyUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyUp) { event in
+            DispatchQueue.main.async {
+                self.currentlyPressedKey = nil
+            }
+        }
+        
+        // Also add local monitors for when the app is in focus
+        localFlagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+            DispatchQueue.main.async {
+                let newModifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+                self.currentlyPressedModifiers = newModifiers
+            }
+            return event
+        }
+        
+        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            DispatchQueue.main.async {
+                if let key = Key(carbonKeyCode: UInt32(event.keyCode)) {
+                    self.currentlyPressedKey = key
+                }
+            }
+            return event
+        }
+        
+        localKeyUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyUp) { event in
+            DispatchQueue.main.async {
+                self.currentlyPressedKey = nil
+            }
+            return event
+        }
+    }
+    
+    private func cleanupKeyMonitoring() {
+        if let monitor = flagsMonitor {
+            NSEvent.removeMonitor(monitor)
+            flagsMonitor = nil
+        }
+        
+        if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyMonitor = nil
+        }
+        
+        if let monitor = keyUpMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyUpMonitor = nil
+        }
+        
+        if let monitor = localFlagsMonitor {
+            NSEvent.removeMonitor(monitor)
+            localFlagsMonitor = nil
+        }
+        
+        if let monitor = localKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            localKeyMonitor = nil
+        }
+        
+        if let monitor = localKeyUpMonitor {
+            NSEvent.removeMonitor(monitor)
+            localKeyUpMonitor = nil
+        }
+        
+        // Reset the state
+        currentlyPressedModifiers = []
+        currentlyPressedKey = nil
+    }
+    
+    private func disableGlobalHotkey() {
+        AppDelegate.shared?.windowManager?.disableGlobalHotkey()
+    }
+    
+    private func enableGlobalHotkey() {
+        AppDelegate.shared?.windowManager?.enableGlobalHotkey()
+    }
+    
+    // MARK: - Helper Methods
     
     // Helper function to convert modifier flags to array
     private func modifierFlagsArray(from flags: NSEvent.ModifierFlags) -> [NSEvent.ModifierFlags] {

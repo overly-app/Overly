@@ -216,6 +216,16 @@ class WindowManager: NSObject, ObservableObject {
         setupToggleHotkey()
     }
 
+    // Method to temporarily disable the global hotkey (for onboarding)
+    func disableGlobalHotkey() {
+        hotKey = nil
+    }
+    
+    // Method to re-enable the global hotkey (after onboarding)
+    func enableGlobalHotkey() {
+        setupToggleHotkey()
+    }
+
     // Method to toggle the custom window's visibility
     func toggleCustomWindowVisibility() {
         print("toggleCustomWindowVisibility called. customWindow is currently: \(customWindow == nil ? "nil" : "not nil")")
@@ -336,6 +346,11 @@ struct OverlyApp: App {
 // A simple App Delegate to hold and manage the WindowManager
 class AppDelegate: NSObject, NSApplicationDelegate {
     var windowManager: WindowManager? // Use optional to allow lazy initialization
+    
+    // Static method to access the WindowManager from anywhere
+    static var shared: AppDelegate? {
+        return NSApp.delegate as? AppDelegate
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Initialize the WindowManager when the application finishes launching
