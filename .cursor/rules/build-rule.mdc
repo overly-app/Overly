@@ -25,5 +25,5 @@ Note: Most of the time you can build it without cleaning, and know just because 
 This ensures that you're testing your new feature from a clean state, catching issues earlier and preventing build artifact bugs.
 
 
-This rule helps break out of feedback loops by enforcing a clean build check before assuming any feature works.
+This rule helps break out of feedback loops by enforcing a clean build check before assuming any feature works. Run the commands using the terminal tool after making changes so you can know and fix syntax/linter errors faster.
 

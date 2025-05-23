@@ -42,9 +42,10 @@ struct GeneralSettingsView: View {
             // Keybind recorder
             KeybindRecorderView(
                 key: $settings.toggleHotkeyKey,
-                modifiers: $settings.toggleHotkeyModifiers
+                modifiers: $settings.toggleHotkeyModifiers,
+                isRecording: .constant(false)
             )
-            .padding(.top)
+            .padding(.vertical)
             
             Divider() // Add another separator
             

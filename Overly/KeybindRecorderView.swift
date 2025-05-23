@@ -12,45 +12,46 @@ import HotKey
 struct KeybindRecorderView: View {
     @Binding var key: Key
     @Binding var modifiers: NSEvent.ModifierFlags
-    @State private var isRecording = false
+    @Binding var isRecording: Bool
     @State private var recordedText = ""
     @State private var eventMonitor: Any?
+    var showLabel: Bool = true
     
     var body: some View {
         HStack {
-            Text("Toggle Window Shortcut:")
-            
-            Button(action: {
-                if isRecording {
-                    stopRecording()
-                } else {
-                    startRecording()
-                }
-            }) {
-                Text(isRecording ? "Recording... (Press keys)" : displayText)
-                    .foregroundColor(isRecording ? .red : .primary)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(isRecording ? Color.red.opacity(0.1) : Color.gray.opacity(0.1))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(isRecording ? Color.red : Color.gray, lineWidth: 1)
-                            )
-                    )
+            if showLabel {
+                Text("Toggle Window Shortcut:")
             }
-            .buttonStyle(PlainButtonStyle())
+            
+            Text(isRecording ? "Recording... (Press keys)" : displayText)
+                .foregroundColor(isRecording ? .red : .primary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isRecording ? Color.red.opacity(0.1) : Color.gray.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(isRecording ? Color.red : Color.gray, lineWidth: 1)
+                        )
+                )
             
             if isRecording {
                 Button("Cancel") {
-                    stopRecording()
+                    isRecording = false
                 }
                 .foregroundColor(.secondary)
             }
         }
         .onAppear {
             updateDisplayText()
+        }
+        .onChange(of: isRecording) { newValue in
+            if newValue {
+                startRecording()
+            } else {
+                stopRecording()
+            }
         }
         .onDisappear {
             if isRecording {
@@ -132,7 +133,8 @@ struct KeybindRecorderView: View {
     }
     
     private func startRecording() {
-        isRecording = true
+        guard isRecording else { return }
+
         recordedText = ""
         
         // Create a local event monitor to capture key events
@@ -146,7 +148,8 @@ struct KeybindRecorderView: View {
     }
     
     private func stopRecording() {
-        isRecording = false
+        guard !isRecording else { return }
+
         updateDisplayText()
         
         // Remove the event monitor
@@ -157,6 +160,8 @@ struct KeybindRecorderView: View {
     }
     
     private func handleKeyEvent(_ event: NSEvent) {
+        guard isRecording else { return }
+
         let eventModifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
         
         if event.type == .keyDown {
@@ -175,8 +180,8 @@ struct KeybindRecorderView: View {
             if isValidKey(newKey) {
                 key = newKey
                 modifiers = eventModifiers
-                stopRecording()
-                
+                isRecording = false
+
                 // Update AppSettings
                 AppSettings.shared.updateToggleHotkey(key: key, modifiers: modifiers)
             }
@@ -199,7 +204,8 @@ struct KeybindRecorderView: View {
 #Preview {
     @Previewable @State var key: Key = .j
     @Previewable @State var modifiers: NSEvent.ModifierFlags = [.command]
+    @Previewable @State var isRecording = false
     
-    return KeybindRecorderView(key: $key, modifiers: $modifiers)
+    KeybindRecorderView(key: $key, modifiers: $modifiers, isRecording: $isRecording)
         .padding()
 } 
