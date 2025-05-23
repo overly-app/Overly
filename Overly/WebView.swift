@@ -139,7 +139,17 @@ struct WebView: NSViewRepresentable {
             // Clean up the popup window and web view when the window is closed
             if let closedWindow = notification.object as? NSWindow, closedWindow == self.popupWindow {
                 print("Popup window will close. Performing cleanup.")
-                self.popupWindow?.contentView = nil // Release the web view
+                
+                // Explicitly invalidate the web view's configuration
+                if let popupWebView = closedWindow.contentView as? WKWebView {
+                     // Stop any loading content
+                    popupWebView.stopLoading()
+                    // Explicitly nil out delegates to break potential cycles
+                    popupWebView.navigationDelegate = nil
+                    popupWebView.uiDelegate = nil
+                }
+
+                self.popupWindow?.contentView = nil // Release the web view from the window
                 self.popupWindow = nil // Release the window reference
                 // Any other necessary cleanup can go here
             }
