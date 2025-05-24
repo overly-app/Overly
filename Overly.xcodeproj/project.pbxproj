@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0D0BE0692DE237CA00489B64 /* SettingsKit in Frameworks */ = {isa = PBXBuildFile; productRef = 0D0BE0682DE237CA00489B64 /* SettingsKit */; };
 		0DDDE95A2DDD722A007BF1F7 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0D0B789D2DDD71BB00D754F7 /* WebKit.framework */; };
 		0DDDE9682DDD74B4007BF1F7 /* HotKey in Frameworks */ = {isa = PBXBuildFile; productRef = 0DDDE9672DDD74B4007BF1F7 /* HotKey */; };
 /* End PBXBuildFile section */
@@ -30,6 +31,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0DDDE9682DDD74B4007BF1F7 /* HotKey in Frameworks */,
+				0D0BE0692DE237CA00489B64 /* SettingsKit in Frameworks */,
 				0DDDE95A2DDD722A007BF1F7 /* WebKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -83,6 +85,7 @@
 			name = Overly;
 			packageProductDependencies = (
 				0DDDE9672DDD74B4007BF1F7 /* HotKey */,
+				0D0BE0682DE237CA00489B64 /* SettingsKit */,
 			);
 			productName = Overly;
 			productReference = 0D0B78892DDD705000D754F7 /* Overly.app */;
@@ -114,6 +117,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				0DDDE9662DDD74B4007BF1F7 /* XCRemoteSwiftPackageReference "HotKey" */,
+				0D0BE0672DE237CA00489B64 /* XCRemoteSwiftPackageReference "SettingsKit-macOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0D0B788A2DDD705000D754F7 /* Products */;
@@ -350,6 +354,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		0D0BE0672DE237CA00489B64 /* XCRemoteSwiftPackageReference "SettingsKit-macOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/david-swift/SettingsKit-macOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.3.0;
+			};
+		};
 		0DDDE9662DDD74B4007BF1F7 /* XCRemoteSwiftPackageReference "HotKey" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/soffes/HotKey";
@@ -361,6 +373,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		0D0BE0682DE237CA00489B64 /* SettingsKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0D0BE0672DE237CA00489B64 /* XCRemoteSwiftPackageReference "SettingsKit-macOS" */;
+			productName = SettingsKit;
+		};
 		0DDDE9672DDD74B4007BF1F7 /* HotKey */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 0DDDE9662DDD74B4007BF1F7 /* XCRemoteSwiftPackageReference "HotKey" */;
