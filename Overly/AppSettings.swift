@@ -13,12 +13,15 @@ struct ChatProvider: Identifiable, Codable, Equatable {
 // Extension to convert AIService to ChatProvider
 extension AIService {
     var asChatProvider: ChatProvider {
-        ChatProvider(
+        // Check if the iconName corresponds to a known SF Symbol (like "link" or "gearshape")
+        let isSFsymbol = iconName == "link" || iconName == "gearshape"
+        
+        return ChatProvider(
             id: self.rawValue,
             name: self.rawValue,
             url: self.url,
             iconName: self.iconName,
-            isSystemImage: self == .settings // Settings is the only system image for now
+            isSystemImage: isSFsymbol // Set isSystemImage based on if the iconName is an SF Symbol
         )
     }
 }
