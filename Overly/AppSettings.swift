@@ -1,6 +1,7 @@
 import SwiftUI
 import Foundation
 import HotKey
+import AppKit
 
 struct ChatProvider: Identifiable, Codable, Equatable {
     let id: String
@@ -26,7 +27,8 @@ extension AIService {
     }
 }
 
-class AppSettings: ObservableObject {
+@MainActor
+class AppSettings: ObservableObject, @unchecked Sendable {
     static let shared = AppSettings()
     
     private let userDefaults = UserDefaults.standard

@@ -46,7 +46,7 @@ struct KeybindRecorderView: View {
         .onAppear {
             updateDisplayText()
         }
-        .onChange(of: isRecording) { newValue in
+        .onChange(of: isRecording) { _, newValue in
             if newValue {
                 startRecording()
             } else {

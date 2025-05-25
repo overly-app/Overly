@@ -1,0 +1,49 @@
+# SwiftLint Configuration for Overly
+# This configuration excludes external dependencies from linting
+
+# Exclude external packages and derived data
+excluded:
+  - .build
+  - DerivedData
+  - Packages
+  - .swiftpm
+  - "*/SourcePackages/*"
+  - "*/checkouts/*"
+  - "**/DerivedData/**"
+  - "**/SourcePackages/**"
+
+# Only include your own source files
+included:
+  - Overly
+
+# Disable rules that are too strict for this project
+disabled_rules:
+  - missing_docs # Disable missing docs for now since external packages trigger this
+  - superfluous_disable_command # Disable this as external packages may have these
+
+# Configure specific rules
+line_length:
+  warning: 120
+  error: 200
+
+# Allow longer function bodies for SwiftUI views
+function_body_length:
+  warning: 60
+  error: 100
+
+# Allow longer type bodies for SwiftUI views and settings
+type_body_length:
+  warning: 300
+  error: 500
+
+# Allow longer files for main app files
+file_length:
+  warning: 500
+  error: 1000
+
+# Custom rules can be added here if needed
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - force_unwrapping
+  - implicitly_unwrapped_optional 

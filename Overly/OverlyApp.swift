@@ -145,7 +145,9 @@ class WindowManager: NSObject, ObservableObject {
     override init() {
         super.init()
         // Set up the toggle hotkey from settings
-        setupToggleHotkey()
+        Task { @MainActor in
+            setupToggleHotkey()
+        }
         
         // Listen for hotkey changes
         NotificationCenter.default.addObserver(
@@ -177,6 +179,7 @@ class WindowManager: NSObject, ObservableObject {
     }
     
     // Method to set up the toggle hotkey from settings
+    @MainActor
     private func setupToggleHotkey() {
         let settings = AppSettings.shared
         
@@ -204,6 +207,7 @@ class WindowManager: NSObject, ObservableObject {
     }
     
     // Method called when hotkey settings change
+    @MainActor
     @objc private func hotkeySettingsChanged() {
         setupToggleHotkey()
     }
@@ -214,6 +218,7 @@ class WindowManager: NSObject, ObservableObject {
     }
     
     // Method to re-enable the global hotkey (after onboarding)
+    @MainActor
     func enableGlobalHotkey() {
         setupToggleHotkey()
     }
@@ -351,6 +356,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return NSApp.delegate as? AppDelegate
     }
 
+    @MainActor
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Initialize the WindowManager when the application finishes launching
         windowManager = WindowManager()

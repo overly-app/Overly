@@ -37,7 +37,7 @@ struct GeneralSettingsView: View {
             Section(header: Text("General")) { // Use a standard SwiftUI Section
                 // Show in Dock Toggle
                 Toggle("Show in Dock", isOn: $settings.showInDock)
-                    .onChange(of: settings.showInDock) { newValue in
+                    .onChange(of: settings.showInDock) { _, newValue in
                         // Explicitly set the activation policy when the toggle changes
                          if newValue {
                              NSApp.setActivationPolicy(.regular)

@@ -123,7 +123,7 @@ struct HotkeyOnboardingView: View {
             )
             .frame(width: 0, height: 0)
             .opacity(0)
-            .onChange(of: isRecordingHotkey) { newValue in
+            .onChange(of: isRecordingHotkey) { _, newValue in
                 if !newValue {
                     // Re-enable global hotkey when recording stops
                     enableGlobalHotkey()
