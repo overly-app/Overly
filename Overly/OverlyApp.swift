@@ -10,6 +10,7 @@ import AppKit
 import Combine
 import HotKey
 import WebKit
+import SettingsKit
 
 // Custom NSVisualEffectView subclass to handle masking for rounded corners
 class MaskedVisualEffectView: NSVisualEffectView {
@@ -135,15 +136,6 @@ class WindowManager: NSObject, ObservableObject {
     private var hotKey: HotKey?
     private var reloadHotKey: HotKey?
     private var nextServiceHotKey: HotKey?
-
-    // Add a state variable to track the current view
-    @Published public var currentView: CurrentViewState = .webView
-
-    // Define an enum for the possible view states
-    public enum CurrentViewState {
-        case webView
-        case settingsView
-    }
 
     // Closures to trigger actions on the visible ContentView
     // These closures will be set by the visible ContentView instance
@@ -291,20 +283,6 @@ class WindowManager: NSObject, ObservableObject {
         }
     }
 
-    // Add a method to show the settings view
-    func showSettingsView() {
-        print("showSettingsView called.")
-        currentView = .settingsView // Just change the state
-        // ContentView will react to this state change automatically
-    }
-
-    // Add a method to show the web view (to switch back from settings)
-    func showWebView() {
-        print("showWebView called.")
-        currentView = .webView // Just change the state
-        // ContentView will react to this state change automatically
-    }
-
     // We no longer need the perform helper methods here
 }
 
@@ -339,6 +317,27 @@ struct OverlyApp: App {
                 Text("Overly") // The text label
             }
             // .background(.ultrathinMaterial) // Apply ultrathin material background
+        }
+        .settings(design: .sidebar) {
+            SettingsTab(.new(title: "General", image: .init(systemName: "gearshape")), id: "general", color: .gray) {
+                SettingsSubtab(.noSelection, id: "general") { 
+                    GeneralSettingsView()
+                        .frame(width: 500)
+                        .fixedSize()
+                        .padding()
+                }
+            }
+            .frame()
+            
+            SettingsTab(.new(title: "Providers", image: .init(systemName: "puzzlepiece")), id: "providers", color: .blue) {
+                SettingsSubtab(.noSelection, id: "providers") { 
+                    ProviderSettingsView()
+                        .frame(width: 500)
+                        .fixedSize()
+                        .padding()
+                }
+            }
+            .frame()
         }
     }
 }

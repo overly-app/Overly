@@ -7,6 +7,7 @@
 
 import SwiftUI
 import WebKit
+import SettingsKit
 
 enum AIService: String, CaseIterable, Identifiable {
     case chatgpt = "ChatGPT"
@@ -117,27 +118,25 @@ struct ServiceDropdownView: View {
                 }
             }
             
-            // Add Settings option separately at the end
-            if let settingsProvider = settings.allBuiltInProviders.first(where: { $0.id == AIService.settings.rawValue }) {
-                Button(action: {
-                    selectedProvider = settingsProvider
-                    dismiss()
-                }) {
-                    HStack {
-                        Image(systemName: settingsProvider.iconName)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 20, height: 20)
-                        Text(settingsProvider.name)
-                        Spacer()
-                    }
-                    .contentShape(Rectangle()) // Make the entire row tappable
+            // Add Settings option using SettingsLink directly
+            SettingsLink {
+                HStack {
+                    Image(systemName: "gearshape")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 20, height: 20)
+                    Text("Settings")
+                    Spacer()
                 }
-                .buttonStyle(.plain)
+                .contentShape(Rectangle()) // Make the entire row tappable
                 .padding(.vertical, 8)
                 .padding(.horizontal, 12)
-                .background(selectedProvider?.id == settingsProvider.id ? Color.accentColor.opacity(0.2) : Color.clear)
+                .background(Color.clear)
                 .cornerRadius(4)
+            }
+            .buttonStyle(.plain)
+            .onTapGesture {
+                dismiss() // Close the dropdown when settings is tapped
             }
         }
         .padding(8) // Inner padding
@@ -295,37 +294,12 @@ struct ContentView: View {
                 // Always display the custom title bar
                 CustomTitleBar(window: window, selectedProvider: $selectedProvider, settings: settings) // Pass selectedProvider binding and settings
                 
-                // Switch the main content based on the current view state
-                Group { // Use a Group to conditionally display content below the title bar
-                    switch windowManager.currentView {
-                    case .webView:
-                        // Display the WebView when in webView state
-                        // Use the URL from the selectedProvider
-                        if let provider = selectedProvider, let url = provider.url {
-                            WebView(url: url)
-                        } else {
-                            // Handle case where no provider is selected or selected provider has no URL
-                             Color.clear // Or some placeholder view
-                        }
-
-                    case .settingsView:
-                        // Display the SettingsView when in settingsView state
-                        SettingsView(windowManager: windowManager) // Pass the windowManager
-                    }
-                }
-                // The main VStack will inherit the padding and background from ContentView's modifiers if any are applied to ContentView itself.
-                // Or, we can apply background/padding here if needed.
-//            .background(.thinMaterial) // Example: Apply background here if not on ContentView
-//            .padding() // Example: Apply padding here if not on ContentView
-            }
-            // Observe changes to selectedProvider and update view state
-            .onChange(of: selectedProvider) { newValue in // Use newValue
-                // If the selected provider is the settings provider, switch to settings view
-                if newValue?.id == AIService.settings.rawValue {
-                    windowManager.showSettingsView()
+                // Display the WebView - settings are now handled by SettingsKit
+                if let provider = selectedProvider, let url = provider.url {
+                    WebView(url: url)
                 } else {
-                    // Otherwise, ensure we are in web view state
-                    windowManager.showWebView()
+                    // Handle case where no provider is selected or selected provider has no URL
+                     Color.clear // Or some placeholder view
                 }
             }
             .onAppear {
@@ -334,12 +308,10 @@ struct ContentView: View {
                      window.reloadAction = { self.reloadWebView() }
                      window.nextServiceAction = { self.selectNextService() }
                  }
-                 // Initialize selectedProvider to the first active provider or settings if no active web providers
-                 if selectedProvider == nil { // Only initialize if not already set (e.g., by a previous onboarding step setting it)
+                 // Initialize selectedProvider to the first active provider
+                 if selectedProvider == nil { // Only initialize if not already set
                      if let firstActiveWebProvider = settings.activeProviders.first(where: { $0.url != nil }) {
                           selectedProvider = firstActiveWebProvider
-                     } else if let settingsProvider = settings.allBuiltInProviders.first(where: { $0.id == AIService.settings.rawValue }) {
-                          selectedProvider = settingsProvider
                      }
                 }
                 

@@ -123,56 +123,6 @@ struct ServiceIconViewSettings: View {
     }
 }
 
-// Extracted view for adding a new provider
-struct AddProviderView: View {
-    @ObservedObject var settings: AppSettings
-    @Binding var newProviderName: String
-    @Binding var newProviderURLString: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Add Custom Provider")
-                .font(.headline)
-                .padding(.leading)
-
-            HStack {
-                TextField("Provider Name", text: $newProviderName)
-                    .textFieldStyle(.roundedBorder)
-                TextField("Provider URL", text: $newProviderURLString)
-                    .textFieldStyle(.roundedBorder)
-                Button("Add") {
-                    if !newProviderName.isEmpty && !newProviderURLString.isEmpty {
-                        var urlString = newProviderURLString
-                        if !urlString.contains("://") {
-                            urlString = "https://" + urlString
-                        }
-
-                        if let url = URL(string: urlString) {
-                            let newProvider = ChatProvider(
-                                id: UUID().uuidString,
-                                name: newProviderName,
-                                url: url,
-                                iconName: "link",
-                                isSystemImage: true
-                            )
-                            settings.addCustomProvider(newProvider)
-                            
-                            Task {
-                                await settings.fetchFavicon(for: newProvider)
-                            }
-
-                            newProviderName = ""
-                            newProviderURLString = ""
-                        }
-                    }
-                }
-                .buttonStyle(.bordered)
-            }
-            .padding(.horizontal)
-        }
-    }
-}
-
 struct ProviderSettingsView: View {
      @ObservedObject var settings = AppSettings.shared
 
@@ -180,17 +130,8 @@ struct ProviderSettingsView: View {
      @State private var newProviderURLString: String = ""
 
      var body: some View {
-         VStack(alignment: .leading, spacing: 20) {
-             Text("Provider Settings")
-                 .font(.largeTitle)
-                 .padding(.top)
-
-             // Section for Built-in Providers
-             VStack(alignment: .leading) {
-                 Text("Built-in Providers")
-                     .font(.headline)
-                     .padding(.leading)
-
+         Form {
+             Section(header: Text("Built-in Providers")) {
                  ScrollView(.horizontal, showsIndicators: false) {
                      HStack {
                          ForEach(settings.allBuiltInProviders.filter { $0.url != nil }) { provider in
@@ -202,15 +143,7 @@ struct ProviderSettingsView: View {
                  .frame(height: 60)
              }
 
-             Divider()
-                 .padding(.vertical, 20)
-
-             // Section for Custom Providers
-             VStack(alignment: .leading) {
-                 Text("Custom Providers")
-                     .font(.headline)
-                     .padding(.leading)
-
+             Section(header: Text("Custom Providers")) {
                  ScrollView(.horizontal, showsIndicators: false) {
                      HStack {
                          ForEach(settings.customProviders) { provider in
@@ -221,14 +154,42 @@ struct ProviderSettingsView: View {
                  }
                  .frame(height: 60)
              }
-             .padding(.bottom)
 
-             Divider()
+             Section(header: Text("Add Custom Provider")) {
+                 HStack {
+                     TextField("Provider Name", text: $newProviderName)
+                         .textFieldStyle(.roundedBorder)
+                     TextField("Provider URL", text: $newProviderURLString)
+                         .textFieldStyle(.roundedBorder)
+                     Button("Add") {
+                         if !newProviderName.isEmpty && !newProviderURLString.isEmpty {
+                             var urlString = newProviderURLString
+                             if !urlString.contains("://") {
+                                 urlString = "https://" + urlString
+                             }
 
-             // Section for adding custom providers
-             AddProviderView(settings: settings, newProviderName: $newProviderName, newProviderURLString: $newProviderURLString)
+                             if let url = URL(string: urlString) {
+                                 let newProvider = ChatProvider(
+                                     id: UUID().uuidString,
+                                     name: newProviderName,
+                                     url: url,
+                                     iconName: "link",
+                                     isSystemImage: true
+                                 )
+                                 settings.addCustomProvider(newProvider)
+                                 
+                                 Task {
+                                     await settings.fetchFavicon(for: newProvider)
+                                 }
 
-             Spacer()
+                                 newProviderName = ""
+                                 newProviderURLString = ""
+                             }
+                         }
+                     }
+                     .buttonStyle(.bordered)
+                 }
+             }
          }
          .padding()
          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

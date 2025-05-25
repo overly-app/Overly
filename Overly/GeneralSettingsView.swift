@@ -8,7 +8,6 @@
 import SwiftUI
 import AppKit
 import HotKey
-import SettingsKit // Import SettingsKit
 
 // Define a struct to decode the GitHub release JSON
 struct GitHubRelease: Decodable {
@@ -20,126 +19,6 @@ struct GitHubRelease: Decodable {
         case name
         case tagName = "tag_name"
         case htmlUrl = "html_url"
-    }
-}
-
-// NSViewRepresentable to bridge AppKit's SettingsTableView to SwiftUI
-struct SettingsTableViewRepresentable: NSViewRepresentable {
-    @Binding var showInDock: Bool
-    @Binding var toggleHotkeyKey: Key
-    @Binding var toggleHotkeyModifiers: NSEvent.ModifierFlags
-    @Binding var hasCompletedOnboarding: Bool
-    var checkForUpdatesAction: () -> Void
-    var currentVersion: String?
-
-    func makeNSView(context: Context) -> SettingsTableView {
-        let settingsView = SettingsTableView()
-        settingsView.translatesAutoresizingMaskIntoConstraints = false
-        
-        // Add Show in Dock row
-        let dockToggle = NSSwitch()
-        dockToggle.state = showInDock ? .on : .off
-        dockToggle.target = context.coordinator
-        dockToggle.action = #selector(Coordinator.toggleShowInDock(_:))
-        dockToggle.tag = 1001
-        settingsView.addRow(labelText: "Show in Dock:", control: dockToggle)
-
-        // Add Hotkey row - Using a text field as integrating the custom SwiftUI KeybindRecorderView here is complex
-        let hotkeyLabel = NSTextField(labelWithString: "Press hotkey to record") // Placeholder
-         hotkeyLabel.translatesAutoresizingMaskIntoConstraints = false
-        // You would need a more complex setup to integrate a real Hotkey recorder in AppKit
-        // For now, we'll just display a placeholder or the current hotkey string.
-        let currentHotkeyDisplay = NSTextField(labelWithString: "Current Hotkey: \(toggleHotkeyModifiers)\(toggleHotkeyKey.description)")
-        currentHotkeyDisplay.isEditable = false
-        currentHotkeyDisplay.isSelectable = false
-        currentHotkeyDisplay.backgroundColor = .clear
-        currentHotkeyDisplay.drawsBackground = false
-        currentHotkeyDisplay.bezelStyle = .roundedBezel
-        currentHotkeyDisplay.isBordered = false
-        currentHotkeyDisplay.tag = 1002
-        settingsView.addRow(labelText: "Toggle Hotkey:", control: currentHotkeyDisplay)
-
-        // Add Reset Onboarding row
-        let resetButton = NSButton(title: "Reset Onboarding", target: context.coordinator, action: #selector(Coordinator.resetOnboarding))
-        resetButton.tag = 1003
-        settingsView.addRow(labelText: "", control: resetButton) // No label for button row
-
-        // Add Check for Updates row
-        let updateButton = NSButton(title: "Check for Updates", target: context.coordinator, action: #selector(Coordinator.checkForUpdates))
-        updateButton.tag = 1004
-        settingsView.addRow(labelText: "", control: updateButton) // No label for button row
-
-        // Add Current Version row
-        if let version = currentVersion {
-            let versionLabel = NSTextField(labelWithString: "Current Version: \(version)")
-            versionLabel.isEditable = false
-            versionLabel.isSelectable = false
-             versionLabel.backgroundColor = .clear
-            versionLabel.drawsBackground = false
-            versionLabel.bezelStyle = .roundedBezel
-            versionLabel.isBordered = false
-            versionLabel.tag = 1005
-            settingsView.addRow(labelText: "", control: versionLabel) // No label for this info row
-        }
-        
-        // Add a spacer to push content to the top (already handled in SettingsTableView but ensuring here)
-         let spacer = NSView()
-         settingsView.stackView.addArrangedSubview(spacer)
-         settingsView.stackView.setViews([spacer], in: .bottom)
-         spacer.setContentHuggingPriority(.defaultLow, for: .vertical)
-
-        return settingsView
-    }
-
-    func updateNSView(_ nsView: SettingsTableView, context: Context) {
-        // Update the state of the controls based on SwiftUI state changes
-        // This part is more involved for bidirectional binding. For simplicity,
-        // we handle AppKit to SwiftUI updates via the Coordinator.
-        // SwiftUI to AppKit updates would require finding the specific control
-        // in the NSView hierarchy and updating its state.
-        // For the dock toggle:
-         if let dockToggle = nsView.stackView.viewWithTag(1001) as? NSSwitch {
-             dockToggle.state = showInDock ? .on : .off
-         }
-
-        // For the hotkey display (update the text)
-        // Find the NSTextField displaying the hotkey
-        if let hotkeyDisplayLabel = nsView.stackView.viewWithTag(1002) as? NSTextField {
-            hotkeyDisplayLabel.stringValue = "Current Hotkey: \(toggleHotkeyModifiers)\(toggleHotkeyKey.description)"
-        }
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-
-    class Coordinator: NSObject {
-        var parent: SettingsTableViewRepresentable
-
-        init(_ parent: SettingsTableViewRepresentable) {
-            self.parent = parent
-        }
-
-        @objc func toggleShowInDock(_ sender: NSSwitch) {
-            parent.showInDock = sender.state == .on
-            // Explicitly set the activation policy when the toggle changes
-             if parent.showInDock {
-                 NSApp.setActivationPolicy(.regular)
-             } else {
-                 NSApp.setActivationPolicy(.accessory)
-                 // Explicitly activate the application when hiding the dock icon
-                 // This might be necessary for the change to take effect immediately.
-                 NSApp.activate(ignoringOtherApps: true)
-             }
-        }
-
-        @objc func resetOnboarding() {
-            parent.hasCompletedOnboarding = false
-        }
-
-        @objc func checkForUpdates() {
-            parent.checkForUpdatesAction()
-        }
     }
 }
 
