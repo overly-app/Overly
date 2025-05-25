@@ -32,6 +32,9 @@ struct GeneralSettingsView: View {
     @State private var updateMessage = ""
     @State private var updateURL: URL? = nil
     
+    // State for hotkey recording
+    @State private var isRecordingHotkey = false
+    
     var body: some View {
         Form { // Use a standard SwiftUI Form
             Section(header: Text("General")) { // Use a standard SwiftUI Section
@@ -49,13 +52,20 @@ struct GeneralSettingsView: View {
                          }
                     }
 
-                // Hotkey Display (SettingsKit doesn't have a direct KeybindRecorder, display current)
+                // Interactive Hotkey Recorder
                 HStack {
-                    Text("Toggle Hotkey:")
-                    Spacer()
-                    Text("\(settings.toggleHotkeyModifiers)\(settings.toggleHotkeyKey.description)") // Display current hotkey
+                    KeybindRecorderView(
+                        key: $settings.toggleHotkeyKey,
+                        modifiers: $settings.toggleHotkeyModifiers,
+                        isRecording: $isRecordingHotkey,
+                        showLabel: true
+                    )
+                    
+                    Button(isRecordingHotkey ? "Cancel" : "Change") {
+                        isRecordingHotkey.toggle()
+                    }
+                    .foregroundColor(isRecordingHotkey ? .red : .blue)
                 }
-                // Note: Integrating a full KeybindRecorderView here would require custom implementation
 
                 // Reset Onboarding Button
                 Button("Reset Onboarding") {

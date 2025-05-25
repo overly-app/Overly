@@ -160,21 +160,21 @@ class WindowManager: NSObject, ObservableObject {
         // Create the global hotkey for Cmd + R
         reloadHotKey = HotKey(key: .r, modifiers: [.command])
         reloadHotKey?.keyDownHandler = { [weak self] in
-            print("Cmd + R hotkey pressed.")
-            print("WindowManager: Attempting to call reloadAction closure.")
+            // print("Cmd + R hotkey pressed.")
+            // print("WindowManager: Attempting to call reloadAction closure.")
             // Call the reload action closure stored in the window
             self?.customWindow?.reloadAction?()
-            print("WindowManager: reloadAction closure call attempted.")
+            // print("WindowManager: reloadAction closure call attempted.")
         }
 
         // Create the global hotkey for Cmd + /
         nextServiceHotKey = HotKey(key: .slash, modifiers: [.command]) // Corrected key name
         nextServiceHotKey?.keyDownHandler = { [weak self] in
-            print("Cmd + / hotkey pressed.")
-            print("WindowManager: Attempting to call nextServiceAction closure.")
+            // print("Cmd + / hotkey pressed.")
+            // print("WindowManager: Attempting to call nextServiceAction closure.")
             // Call the switch service action closure stored in the window
             self?.customWindow?.nextServiceAction?()
-            print("WindowManager: nextServiceAction closure call attempted.")
+            // print("WindowManager: nextServiceAction closure call attempted.")
         }
     }
     
@@ -201,7 +201,7 @@ class WindowManager: NSObject, ObservableObject {
         // Create the hotkey
         hotKey = HotKey(key: settings.toggleHotkeyKey, modifiers: hotkeyModifiers)
         hotKey?.keyDownHandler = { [weak self] in
-            print("Toggle hotkey pressed.")
+            // print("Toggle hotkey pressed.")
             self?.toggleCustomWindowVisibility()
         }
     }
@@ -225,9 +225,9 @@ class WindowManager: NSObject, ObservableObject {
 
     // Method to toggle the custom window's visibility
     func toggleCustomWindowVisibility() {
-        print("toggleCustomWindowVisibility called. customWindow is currently: \(customWindow == nil ? "nil" : "not nil")")
+        // print("toggleCustomWindowVisibility called. customWindow is currently: \(customWindow == nil ? "nil" : "not nil")")
         if customWindow == nil {
-            print("customWindow is nil, creating new window.")
+            //print("customWindow is nil, creating new window.")
             // If the window hasn't been created yet, create it
             let newWindow = BorderlessWindow(
                 // Adjust the width and height for the requested size (800x450)
@@ -269,22 +269,29 @@ class WindowManager: NSObject, ObservableObject {
         // Now that we are sure customWindow is not nil, toggle its visibility
         if let window = customWindow {
             let isVisible = window.isVisible
-            print("customWindow is not nil. Current visibility: \(isVisible).")
+            // print("customWindow is not nil. Current visibility: \(isVisible).")
             window.setIsVisible(!isVisible)
 
             // Always attempt to make it key and order front when showing
             if !isVisible { // If the window *was* hidden and is now visible
-                print("Window was hidden, making visible and ordering front.")
+                // print("Window was hidden, making visible and ordering front.")
                 // Activate the application to ensure the window can become key
                 NSApp.activate(ignoringOtherApps: true)
                 window.makeKeyAndOrderFront(nil)
                 window.center() // Center the window every time it is shown
             }
              else { // If the window *was* visible and is now hidden
-                 print("Window was visible, hiding.")
+                 //print("Window was visible, hiding.")
                  // Optionally, you might want to resign key window status when hiding
                  // window.resignKey()
              }
+        }
+    }
+    
+    // Method to hide the custom window (for settings)
+    func hideCustomWindow() {
+        if let window = customWindow, window.isVisible {
+            window.setIsVisible(false)
         }
     }
 

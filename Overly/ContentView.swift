@@ -59,6 +59,7 @@ struct ServiceDropdownView: View {
     @Binding var selectedProvider: ChatProvider? // Change to ChatProvider?
     var dismiss: () -> Void
     @ObservedObject var settings: AppSettings // Observe AppSettings
+    var windowManager: WindowManager? // Add WindowManager parameter
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -136,6 +137,8 @@ struct ServiceDropdownView: View {
             }
             .buttonStyle(.plain)
             .onTapGesture {
+                // Hide the floating window when settings is opened
+                windowManager?.hideCustomWindow()
                 dismiss() // Close the dropdown when settings is tapped
             }
         }
@@ -151,6 +154,7 @@ struct CustomTitleBar: View {
     let window: NSWindow? // Add a property to hold the window reference
     @Binding var selectedProvider: ChatProvider? // Change to ChatProvider?
     @ObservedObject var settings: AppSettings // Observe AppSettings
+    var windowManager: WindowManager? // Add WindowManager parameter
     @State private var showingDropdown = false // State to control dropdown visibility
     @State private var isHoveringButton = false // Track if the button is hovered
     @State private var isHoveringDropdown = false // Track if the dropdown is hovered
@@ -213,7 +217,7 @@ struct CustomTitleBar: View {
                     showingDropdown = false
                     closeDropdownWorkItem?.cancel()
                     // The view switching logic is now handled by the .onChange in ContentView
-                }, settings: settings) // Pass AppSettings instance
+                }, settings: settings, windowManager: windowManager) // Pass AppSettings instance and WindowManager
                 // Track hover state over the dropdown content
                 .onHover {
                     isHovering in
@@ -292,7 +296,7 @@ struct ContentView: View {
             // Original content when onboarding is done
             VStack(spacing: 0) { // Use a VStack with no spacing for the main content area
                 // Always display the custom title bar
-                CustomTitleBar(window: window, selectedProvider: $selectedProvider, settings: settings) // Pass selectedProvider binding and settings
+                CustomTitleBar(window: window, selectedProvider: $selectedProvider, settings: settings, windowManager: windowManager) // Pass selectedProvider binding and settings
                 
                 // Display the WebView - settings are now handled by SettingsKit
                 if let provider = selectedProvider, let url = provider.url {
