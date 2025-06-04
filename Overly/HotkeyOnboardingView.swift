@@ -131,26 +131,17 @@ struct HotkeyOnboardingView: View {
             }
             
             // Continue button at bottom
-            HStack {
-                Spacer()
-                Button(action: {
-                    onCompletion()
-                }) {
-                    HStack(spacing: 8) {
-                        Text("Continue")
-                            .font(.system(size: 14, weight: .medium))
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(Color.blue)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            Button(action: {
+                onCompletion()
+            }) {
+                HStack(spacing: 8) {
+                    Text("Continue")
+                        .font(.system(size: 14, weight: .medium))
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 12, weight: .medium))
                 }
-                .buttonStyle(.plain)
             }
+            .buttonStyle(OnboardingButtonStyle())
             .padding(.horizontal, 40)
             .padding(.bottom, 40)
         }
