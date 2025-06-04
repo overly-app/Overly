@@ -15,12 +15,12 @@ struct OnboardingButtonStyleServiceSelection: ButtonStyle {
     }
 }
 
-// Custom view for the provider chip design
+// Chip-style provider view with checkbox styling
 struct ProviderChipView: View {
     @Environment(\.colorScheme) var colorScheme
     let provider: ChatProvider
     @ObservedObject var settings: AppSettings
-    let onDelete: (String) -> Void // Action to perform when deleting a custom provider
+    let onDelete: (String) -> Void
 
     var isSelected: Bool {
         settings.activeProviderIds.contains(provider.id)
@@ -30,42 +30,53 @@ struct ProviderChipView: View {
         Button(action: {
             settings.toggleActiveProvider(id: provider.id)
         }) {
-            HStack {
+            HStack(spacing: 8) {
+                // Checkbox indicator
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isSelected ? .accentColor : .secondary)
+                    .font(.system(size: 14))
+                
+                // Service icon
                 ServiceIconView(provider: provider, settings: settings)
+                    .frame(width: 16, height: 16)
+                
+                // Service name
                 Text(provider.name)
-                    .foregroundColor(isSelected ? (colorScheme == .dark ? .black : .white) : .primary)
-                    .fontWeight(isSelected ? .bold : .regular)
+                    .foregroundColor(isSelected ? .white : .primary)
+                    .fontWeight(isSelected ? .semibold : .regular)
+                    .font(.system(size: 14))
 
-                // Add remove button for custom providers
+                // Delete button for custom providers
                 if settings.customProviders.contains(where: { $0.id == provider.id }) {
                     Button(action: {
                         onDelete(provider.id)
                     }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.gray)
+                            .foregroundColor(.secondary)
+                            .font(.system(size: 12))
                     }
                     .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(isSelected ? (colorScheme == .dark ? .white : .black) : (colorScheme == .dark ? Color.gray.opacity(0.2) : Color.gray.opacity(0.1)))
+            .background(Color(NSColor.controlBackgroundColor))
+            .foregroundColor(.primary)
             .cornerRadius(16)
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(isSelected ? (colorScheme == .dark ? .white : .black) : .clear, lineWidth: isSelected ? 2 : 1)
+                    .stroke(isSelected ? .white : Color(NSColor.separatorColor), lineWidth: isSelected ? 2 : 1)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 16)) // Make the whole chip tappable
         }
-        .buttonStyle(.plain) // Use plain button style to avoid default button appearance
-        .contextMenu { // Add context menu for deletion, only for custom providers
+        .buttonStyle(.plain)
+        .contextMenu {
             if settings.customProviders.contains(where: { $0.id == provider.id }) {
                 Button("Delete", role: .destructive) {
                     onDelete(provider.id)
                 }
             }
         }
-        .onAppear { // Add onAppear to fetch favicon when the view appears
+        .onAppear {
             if provider.url != nil && settings.faviconCache[provider.id] == nil {
                 Task {
                     await settings.fetchFavicon(for: provider)
@@ -75,132 +86,273 @@ struct ProviderChipView: View {
     }
 }
 
+// Helper view for wrapping layout
+struct WrappingHStack<Content: View>: View {
+    let content: () -> Content
+    let spacing: CGFloat
+    
+    init(spacing: CGFloat = 8, @ViewBuilder content: @escaping () -> Content) {
+        self.spacing = spacing
+        self.content = content
+    }
+    
+    var body: some View {
+        GeometryReader { geometry in
+            self.generateContent(in: geometry)
+        }
+    }
+    
+    private func generateContent(in geometry: GeometryProxy) -> some View {
+        var width = CGFloat.zero
+        var height = CGFloat.zero
+        
+        return ZStack(alignment: .topLeading) {
+            ForEach(Array(extractViews().enumerated()), id: \.offset) { index, view in
+                view
+                    .alignmentGuide(.leading, computeValue: { d in
+                        if (abs(width - d.width) > geometry.size.width) {
+                            width = 0
+                            height -= d.height + spacing
+                        }
+                        let result = width
+                        if index == extractViews().count - 1 {
+                            width = 0
+                        } else {
+                            width -= d.width + spacing
+                        }
+                        return result
+                    })
+                    .alignmentGuide(.top, computeValue: { _ in
+                        let result = height
+                        if index == extractViews().count - 1 {
+                            height = 0
+                        }
+                        return result
+                    })
+            }
+        }
+    }
+    
+    private func extractViews() -> [AnyView] {
+        // This is a simplified version - in practice you'd need a more sophisticated approach
+        // For now, we'll use the chip views directly in the parent
+        return []
+    }
+}
+
 struct ServiceSelectionView: View {
-    // Add a binding or action to dismiss this view and proceed
     let onCompletion: () -> Void
-
-    @ObservedObject var settings = AppSettings.shared // Observe AppSettings
-
+    @ObservedObject var settings = AppSettings.shared
     @State private var newCustomProviderName: String = ""
     @State private var newCustomProviderURLString: String = ""
 
     var body: some View {
-        VStack {
-            Text("Select Your Providers")
-                .font(.largeTitle)
-                .padding(.top) // Add top padding
-
-            // Section for Built-in Providers
-            VStack(alignment: .leading) {
-                Text("Providers")
-                    .font(.headline)
-                    .padding(.leading)
-
-                ScrollView(.horizontal, showsIndicators: false) { // Use ScrollView for horizontal scrolling
-                    HStack {
-                        // Show all built-in providers except 'Settings'
-                        ForEach(settings.allBuiltInProviders.filter { $0.url != nil }) { provider in
-                            ProviderChipView(provider: provider, settings: settings, onDelete: deleteCustomProvider) // Use the new chip view
-                        }
-                    }
-                    .padding(.horizontal) // Add horizontal padding to the HStack inside the ScrollView
-                }
-                .frame(height: 60) // Give the ScrollView a fixed height
+        VStack(spacing: 24) {
+            // Header
+            VStack(spacing: 8) {
+                Text("Select Your Providers")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                
+                Text("Choose which AI services you'd like to use with Overly")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
             }
-            // No padding bottom here, let the divider handle spacing
+            .padding(.top, 20)
 
-            Divider() // Add a divider between sections
-                .padding(.vertical, 20) // Adjusted padding
-
-            // Section for Custom Providers
-            VStack(alignment: .leading) {
-                Text("Custom Providers")
-                    .font(.headline)
-                    .padding(.leading)
-
-                ScrollView(.horizontal, showsIndicators: false) { // Use ScrollView for horizontal scrolling
-                    HStack {
-                        // Show Custom Providers
-                        ForEach(settings.customProviders) { provider in
-                            ProviderChipView(provider: provider, settings: settings, onDelete: deleteCustomProvider) // Use the new chip view
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Built-in Providers Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Built-in Providers")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                            Spacer()
                         }
-                    }
-                    .padding(.horizontal) // Add horizontal padding to the HStack inside the ScrollView
-                }
-                .frame(height: 60) // Give the ScrollView a fixed height
-            }
-            .padding(.bottom) // Add padding bottom after the custom providers section
-
-            // Section for Add Custom Provider
-            VStack(alignment: .leading) {
-                Text("Add Custom Provider")
-                    .font(.headline)
-                    .padding(.leading)
-
-                HStack {
-                    TextField("Provider Name", text: $newCustomProviderName)
-                        .textFieldStyle(.roundedBorder)
-                    TextField("Provider URL", text: $newCustomProviderURLString)
-                        .textFieldStyle(.roundedBorder)
-                    Button("Add") {
-                        // Add action to add custom provider
-                        if !newCustomProviderName.isEmpty && !newCustomProviderURLString.isEmpty {
-                            // Add https:// if missing
-                            var urlString = newCustomProviderURLString
-                            if !urlString.contains("://") {
-                                urlString = "https://" + urlString
+                        .padding(.horizontal, 16)
+                        
+                        // Wrapping layout for chips
+                        FlowLayout(spacing: 8) {
+                            ForEach(settings.allBuiltInProviders.filter { $0.url != nil }) { provider in
+                                ProviderChipView(provider: provider, settings: settings, onDelete: deleteCustomProvider)
                             }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color(NSColor.controlBackgroundColor))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color(NSColor.separatorColor), lineWidth: 1)
+                        )
+                    }
+                    .frame(maxWidth: .infinity)
 
-                            if let url = URL(string: urlString) {
-                                let newProvider = ChatProvider(
-                                    id: UUID().uuidString, // Generate a unique ID
-                                    name: newCustomProviderName,
-                                    url: url,
-                                    iconName: "link", // Default icon for custom providers
-                                    isSystemImage: true // Treat custom providers as system images for simplicity for now
-                                )
-                                settings.addCustomProvider(newProvider) // Add and make active
-                                
-                                // Fetch favicon for the new provider
-                                Task { // Use a Task to call the async function
-                                    await settings.fetchFavicon(for: newProvider)
+                    // Custom Providers Section
+                    if !settings.customProviders.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("Custom Providers")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 16)
+                            
+                            FlowLayout(spacing: 8) {
+                                ForEach(settings.customProviders) { provider in
+                                    ProviderChipView(provider: provider, settings: settings, onDelete: deleteCustomProvider)
                                 }
-
-                                // Clear text fields after adding
-                                newCustomProviderName = ""
-                                newCustomProviderURLString = ""
                             }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(Color(NSColor.controlBackgroundColor))
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color(NSColor.separatorColor), lineWidth: 1)
+                            )
                         }
+                        .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
+
+                    // Add Custom Provider Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Add Custom Provider")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        
+                        HStack(spacing: 8) {
+                            TextField("Provider Name", text: $newCustomProviderName)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(maxWidth: .infinity)
+                            
+                            TextField("Provider URL", text: $newCustomProviderURLString)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(maxWidth: .infinity)
+                            
+                            Button("Add") {
+                                addCustomProvider()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(newCustomProviderName.isEmpty || newCustomProviderURLString.isEmpty)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color(NSColor.controlBackgroundColor))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color(NSColor.separatorColor), lineWidth: 1)
+                        )
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, 20)
             }
-            .padding(.bottom) // Add padding after the add custom provider section
 
-            Spacer() // Pushes content to the top
+            Spacer()
 
+            // Continue Button
             Button("Finish Setup") {
-                // Save settings and call the completion action
-                settings.saveSettings() // Ensure latest changes are saved
+                settings.saveSettings()
                 onCompletion()
             }
-            .padding()
-            .buttonStyle(OnboardingButtonStyleServiceSelection()) // Apply the custom button style
-
-            // No longer need Spacer() here because content is pushed by the one above
-            // Spacer() // Pushes content to the bottom
+            .buttonStyle(OnboardingButtonStyleServiceSelection())
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
         }
-        .padding()
-        .frame(width: 800, height: 500) // Match the onboarding window size
+        .frame(width: 800, height: 500)
     }
 
-    // Function to handle deleting custom providers by ID
+    private func addCustomProvider() {
+        guard !newCustomProviderName.isEmpty && !newCustomProviderURLString.isEmpty else { return }
+        
+        var urlString = newCustomProviderURLString
+        if !urlString.contains("://") {
+            urlString = "https://" + urlString
+        }
+
+        guard let url = URL(string: urlString) else { return }
+        
+        let newProvider = ChatProvider(
+            id: UUID().uuidString,
+            name: newCustomProviderName,
+            url: url,
+            iconName: "link",
+            isSystemImage: true
+        )
+        
+        settings.addCustomProvider(newProvider)
+        
+        Task {
+            await settings.fetchFavicon(for: newProvider)
+        }
+
+        newCustomProviderName = ""
+        newCustomProviderURLString = ""
+    }
+
     func deleteCustomProvider(id: String) {
         settings.customProviders.removeAll { $0.id == id }
         settings.activeProviderIds.remove(id)
         settings.faviconCache.removeValue(forKey: id)
         settings.saveSettings()
+    }
+}
+
+// FlowLayout for wrapping chips
+struct FlowLayout: Layout {
+    var spacing: CGFloat
+    
+    init(spacing: CGFloat = 8) {
+        self.spacing = spacing
+    }
+    
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        return layout(sizes: sizes, proposal: proposal).size
+    }
+    
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let offsets = layout(sizes: sizes, proposal: proposal).offsets
+        
+        for (offset, subview) in zip(offsets, subviews) {
+            subview.place(at: CGPoint(x: bounds.minX + offset.x, y: bounds.minY + offset.y), proposal: .unspecified)
+        }
+    }
+    
+    private func layout(sizes: [CGSize], proposal: ProposedViewSize) -> (offsets: [CGPoint], size: CGSize) {
+        let containerWidth = proposal.width ?? .infinity
+        var offsets: [CGPoint] = []
+        var currentPosition = CGPoint.zero
+        var lineHeight: CGFloat = 0
+        var maxX: CGFloat = 0
+        var maxY: CGFloat = 0
+        
+        for size in sizes {
+            if currentPosition.x + size.width > containerWidth && currentPosition.x > 0 {
+                // Move to next line
+                currentPosition.x = 0
+                currentPosition.y += lineHeight + spacing
+                lineHeight = 0
+            }
+            
+            offsets.append(currentPosition)
+            lineHeight = max(lineHeight, size.height)
+            currentPosition.x += size.width + spacing
+            maxX = max(maxX, currentPosition.x - spacing)
+            maxY = max(maxY, currentPosition.y + size.height)
+        }
+        
+        return (offsets, CGSize(width: maxX, height: maxY))
     }
 }
 
@@ -227,8 +379,7 @@ struct ServiceIconView: View {
                      .aspectRatio(contentMode: .fit)
                      .frame(width: 20, height: 20)
                      .onAppear {
-                          // Attempt to fetch favicon if it's a custom provider without a cached icon
-                         if provider.url != nil && settings.faviconCache[provider.id] == nil && settings.customProviders.contains(where: { $0.id == provider.id }) {
+                          if provider.url != nil && settings.faviconCache[provider.id] == nil && settings.customProviders.contains(where: { $0.id == provider.id }) {
                              Task {
                                  await settings.fetchFavicon(for: provider)
                              }
@@ -240,7 +391,7 @@ struct ServiceIconView: View {
 }
 
 #Preview {
-    ServiceSelectionView(onCompletion: { // Dummy action for preview
+    ServiceSelectionView(onCompletion: {
         print("Service Selection Finished!")
     })
 } 
