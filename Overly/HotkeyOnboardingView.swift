@@ -45,7 +45,7 @@ struct HotkeyOnboardingView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 
                 // Subtitle
-                Text("Get started with Overly and discover a seamless way to manage your workflow.")
+                Text("Get started with Overly by setting a hotkey to toggle the window.")
                     .font(.system(size: 16, weight: .regular))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.leading)
@@ -125,8 +125,8 @@ struct HotkeyOnboardingView: View {
             .opacity(0)
             .onChange(of: isRecordingHotkey) { _, newValue in
                 if !newValue {
-                    // Re-enable global hotkey when recording stops
-                    enableGlobalHotkey()
+                    // Don't re-enable global hotkey here - keep it disabled during entire onboarding
+                    // It will be re-enabled in onDisappear when leaving the onboarding view
                 }
             }
             
@@ -155,12 +155,13 @@ struct HotkeyOnboardingView: View {
             .padding(.bottom, 40)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(NSColor.windowBackgroundColor))
         .onAppear {
+            print("HotkeyOnboardingView: onAppear called")
             setupKeyMonitoring()
             disableGlobalHotkey()
         }
         .onDisappear {
+            print("HotkeyOnboardingView: onDisappear called")
             cleanupKeyMonitoring()
             enableGlobalHotkey()
         }
@@ -256,11 +257,15 @@ struct HotkeyOnboardingView: View {
     }
     
     private func disableGlobalHotkey() {
-        AppDelegate.shared?.windowManager?.disableGlobalHotkey()
+        print("HotkeyOnboardingView: Attempting to disable global hotkey...")
+        WindowManager.shared.disableGlobalHotkey()
+        print("HotkeyOnboardingView: Called disableGlobalHotkey on WindowManager")
     }
     
     private func enableGlobalHotkey() {
-        AppDelegate.shared?.windowManager?.enableGlobalHotkey()
+        print("HotkeyOnboardingView: Attempting to enable global hotkey...")
+        WindowManager.shared.enableGlobalHotkey()
+        print("HotkeyOnboardingView: Called enableGlobalHotkey on WindowManager")
     }
     
     // MARK: - Helper Methods

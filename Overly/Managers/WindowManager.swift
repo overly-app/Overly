@@ -12,11 +12,14 @@ import HotKey
 
 // Class to manage the window and hotkey
 class WindowManager: NSObject, ObservableObject {
+    static let shared = WindowManager()
+    
     private var customWindow: BorderlessWindow? // Use BorderlessWindow type
     private var hotKey: HotKey?
     private var reloadHotKey: HotKey?
     private var nextServiceHotKey: HotKey?
     private var settingsHotKey: HotKey?
+    private var isHotkeyDisabled = false // Track if hotkey is intentionally disabled
 
     // Closures to trigger actions on the visible ContentView
     // These closures will be set by the visible ContentView instance
@@ -59,6 +62,7 @@ class WindowManager: NSObject, ObservableObject {
     // Method to set up the toggle hotkey from settings
     @MainActor
     private func setupToggleHotkey() {
+        print("WindowManager: setupToggleHotkey called")
         let settings = AppSettings.shared
         
         // Convert NSEvent.ModifierFlags to HotKey modifiers
@@ -77,17 +81,21 @@ class WindowManager: NSObject, ObservableObject {
         }
         
         // Create the hotkey
+        print("WindowManager: Creating hotkey with key: \(settings.toggleHotkeyKey) and modifiers: \(hotkeyModifiers)")
         hotKey = HotKey(key: settings.toggleHotkeyKey, modifiers: hotkeyModifiers)
         hotKey?.keyDownHandler = { [weak self] in
-            // print("Toggle hotkey pressed.")
+            print("WindowManager: Toggle hotkey pressed!")
             self?.toggleCustomWindowVisibility()
         }
+        print("WindowManager: Hotkey created and handler set")
     }
     
     // Method called when hotkey settings change
     @MainActor
     @objc private func hotkeySettingsChanged() {
-        setupToggleHotkey()
+        if !isHotkeyDisabled {
+            setupToggleHotkey()
+        }
     }
 
     // Method called when a window becomes key (like settings window)
@@ -110,13 +118,24 @@ class WindowManager: NSObject, ObservableObject {
 
     // Method to temporarily disable the global hotkey (for onboarding)
     func disableGlobalHotkey() {
-        hotKey = nil
+        print("WindowManager: disableGlobalHotkey called")
+        isHotkeyDisabled = true
+        if hotKey != nil {
+            print("WindowManager: HotKey exists, setting to nil")
+            hotKey = nil
+            print("WindowManager: HotKey set to nil")
+        } else {
+            print("WindowManager: HotKey was already nil")
+        }
     }
     
     // Method to re-enable the global hotkey (after onboarding)
     @MainActor
     func enableGlobalHotkey() {
+        print("WindowManager: enableGlobalHotkey called")
+        isHotkeyDisabled = false
         setupToggleHotkey()
+        print("WindowManager: setupToggleHotkey completed")
     }
 
     // Method to enable context-sensitive hotkeys when window is visible

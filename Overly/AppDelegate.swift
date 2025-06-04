@@ -9,7 +9,9 @@ import AppKit
 
 // A simple App Delegate to hold and manage the WindowManager
 class AppDelegate: NSObject, NSApplicationDelegate {
-    var windowManager: WindowManager? // Use optional to allow lazy initialization
+    var windowManager: WindowManager? {
+        return WindowManager.shared
+    }
     
     // Static method to access the WindowManager from anywhere
     static var shared: AppDelegate? {
@@ -18,8 +20,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Initialize the WindowManager when the application finishes launching
-        windowManager = WindowManager()
+        // Use the shared WindowManager instance
+        let windowManager = WindowManager.shared
 
         // Ensure AppSettings is fully loaded and UserDefaults is synchronized
         let settings = AppSettings.shared
@@ -31,7 +33,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if settings.showInDock {
                 NSApp.setActivationPolicy(.regular) // Show in Dock
                 // Show the window immediately on launch if showing in dock
-                self.windowManager?.toggleCustomWindowVisibility()
+                windowManager.toggleCustomWindowVisibility()
             } else {
                 NSApp.setActivationPolicy(.accessory) // Hide from Dock
                 // When hiding the dock icon on launch, explicitly activate the application
