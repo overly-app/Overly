@@ -5,6 +5,7 @@ import AuthenticationServices // Import for passkey support
 
 struct WebView: NSViewRepresentable {
     let url: URL
+    @Binding var isLoading: Bool // Add binding for loading state
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -271,8 +272,19 @@ struct WebView: NSViewRepresentable {
 
         // MARK: - WKNavigationDelegate Methods
         
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            print("WebView did start provisional navigation to: \(webView.url?.absoluteString ?? "unknown")")
+            DispatchQueue.main.async {
+                self.parent.isLoading = true
+            }
+        }
+        
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             print("WebView did finish navigation to: \(webView.url?.absoluteString ?? "unknown")")
+            
+            DispatchQueue.main.async {
+                self.parent.isLoading = false
+            }
             
             // Inject additional WebAuthn debugging if needed
             let debugScript = """
@@ -294,10 +306,16 @@ struct WebView: NSViewRepresentable {
         
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
             print("WebView navigation failed with error: \(error.localizedDescription)")
+            DispatchQueue.main.async {
+                self.parent.isLoading = false
+            }
         }
         
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
             print("WebView provisional navigation failed with error: \(error.localizedDescription)")
+            DispatchQueue.main.async {
+                self.parent.isLoading = false
+            }
         }
 
         // MARK: - NSWindowDelegate Methods

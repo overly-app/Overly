@@ -48,6 +48,86 @@ enum AIService: String, CaseIterable, Identifiable {
     }
 }
 
+// Progress bar component for WebView loading
+struct ProgressBarView: View {
+    @Binding var isLoading: Bool
+    @State private var progress: Double = 0.0
+    @State private var animationTimer: Timer?
+    @State private var isVisible: Bool = false
+    
+    var body: some View {
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                ZStack(alignment: .leading) {
+                    // Transparent background
+                    Rectangle()
+                        .fill(Color.clear)
+                        .frame(height: 3)
+                    
+                    // White progress indicator
+                    Rectangle()
+                        .fill(Color.white)
+                        .frame(width: progress * geometry.size.width, height: 3)
+                        .opacity(isVisible ? 1.0 : 0.0)
+                        .animation(.easeInOut(duration: 0.2), value: isVisible)
+                }
+            }
+        }
+        .frame(height: 3)
+        .onChange(of: isLoading) { oldValue, newValue in
+            if newValue {
+                startAnimation()
+            } else {
+                // Complete the progress bar to 100% first
+                completeAnimation()
+            }
+        }
+    }
+    
+    private func startAnimation() {
+        progress = 0.0
+        isVisible = true
+        animationTimer?.invalidate()
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            if progress < 0.95 {
+                // Calculate increment based on progress (speeds up as it gets closer)
+                let baseIncrement: Double = 0.015
+                let accelerationFactor = 1.0 + (progress * 2.0) // Speed increases as progress increases
+                let increment = baseIncrement * accelerationFactor
+                
+                withAnimation(.linear(duration: 0.1)) {
+                    progress += increment
+                }
+            }
+        }
+    }
+    
+    private func completeAnimation() {
+        animationTimer?.invalidate()
+        animationTimer = nil
+        
+        // Keep visible and smoothly complete the remaining progress to 100%
+        withAnimation(.linear(duration: 0.8)) {
+            progress = 1.0
+        }
+        
+        // Hold at 100% for a moment to show completion, then hide
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            withAnimation(.easeOut(duration: 0.1)) {
+                isVisible = false
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                progress = 0.0
+            }
+        }
+    }
+    
+    private func stopAnimation() {
+        animationTimer?.invalidate()
+        animationTimer = nil
+    }
+}
+
 // Custom view for the dropdown menu content
 struct ServiceDropdownView: View {
     @Binding var selectedProvider: ChatProvider? // Change to ChatProvider?
@@ -280,6 +360,7 @@ struct ContentView: View {
     @ObservedObject var settings = AppSettings.shared // Observe AppSettings
 
     @State private var selectedProvider: ChatProvider? // Change to ChatProvider?
+    @State private var isLoading: Bool = false // Add loading state
     
     // Add the AppStorage variable back inside the struct
     @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
@@ -292,9 +373,12 @@ struct ContentView: View {
                 // Always display the custom title bar
                 CustomTitleBar(window: window, selectedProvider: $selectedProvider, settings: settings, windowManager: windowManager) // Pass selectedProvider binding and settings
                 
+                // Add progress bar between header and WebView
+                ProgressBarView(isLoading: $isLoading)
+                
                 // Display the WebView - settings are now handled by SettingsKit
                 if let provider = selectedProvider, let url = provider.url {
-                    WebView(url: url)
+                    WebView(url: url, isLoading: $isLoading)
                 } else {
                     // Handle case where no provider is selected or selected provider has no URL
                      Color.clear // Or some placeholder view
