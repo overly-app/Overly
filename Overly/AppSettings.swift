@@ -37,6 +37,8 @@ class AppSettings: ObservableObject, @unchecked Sendable {
     private let faviconCacheKey = "faviconCache"
     private let toggleHotkeyKeyKey = "toggleHotkeyKey"
     private let toggleHotkeyModifiersKey = "toggleHotkeyModifiers"
+    private let showInDockKey = "showInDock"
+    private let windowFrameKey = "windowFrame"
 
     @Published var customProviders: [ChatProvider] = []
     @Published var activeProviderIds: Set<String> = Set()
@@ -44,6 +46,7 @@ class AppSettings: ObservableObject, @unchecked Sendable {
     @Published var showInDock: Bool = true
     @Published var toggleHotkeyKey: Key = .j
     @Published var toggleHotkeyModifiers: NSEvent.ModifierFlags = [.command]
+    @Published var windowFrame: NSRect = NSRect(x: 0, y: 0, width: 500, height: 600)
     
     // Computed property to get all providers (built-in + custom)
     var allBuiltInProviders: [ChatProvider] {
@@ -81,6 +84,20 @@ class AppSettings: ObservableObject, @unchecked Sendable {
             faviconCache = decodedFaviconCache
         }
         
+        // Load showInDock setting
+        showInDock = userDefaults.object(forKey: showInDockKey) as? Bool ?? true
+        
+        // Load window frame
+        if let frameData = userDefaults.data(forKey: windowFrameKey) {
+            do {
+                let decodedFrame = try JSONDecoder().decode(WindowFrameData.self, from: frameData)
+                windowFrame = NSRect(x: decodedFrame.x, y: decodedFrame.y, width: decodedFrame.width, height: decodedFrame.height)
+            } catch {
+                // If decoding fails, use default frame
+                windowFrame = NSRect(x: 0, y: 0, width: 500, height: 600)
+            }
+        }
+        
         // Load toggle hotkey settings
         if let keyRawValue = userDefaults.object(forKey: toggleHotkeyKeyKey) as? UInt16 {
             if let key = Key(carbonKeyCode: UInt32(keyRawValue)) {
@@ -107,6 +124,15 @@ class AppSettings: ObservableObject, @unchecked Sendable {
         // Save favicon cache
         if let encodedFaviconCache = try? JSONEncoder().encode(faviconCache) {
              userDefaults.set(encodedFaviconCache, forKey: faviconCacheKey)
+        }
+        
+        // Save showInDock setting
+        userDefaults.set(showInDock, forKey: showInDockKey)
+        
+        // Save window frame
+        let frameData = WindowFrameData(x: windowFrame.origin.x, y: windowFrame.origin.y, width: windowFrame.size.width, height: windowFrame.size.height)
+        if let encodedFrame = try? JSONEncoder().encode(frameData) {
+            userDefaults.set(encodedFrame, forKey: windowFrameKey)
         }
         
         // Save toggle hotkey settings
@@ -215,4 +241,18 @@ class AppSettings: ObservableObject, @unchecked Sendable {
              // Optionally, set a placeholder or update UI to show failure
         }
     }
+    
+    // Method to update window frame
+    func updateWindowFrame(_ frame: NSRect) {
+        windowFrame = frame
+        saveSettings()
+    }
+}
+
+// Helper struct for encoding/decoding NSRect
+private struct WindowFrameData: Codable {
+    let x: CGFloat
+    let y: CGFloat
+    let width: CGFloat
+    let height: CGFloat
 } 

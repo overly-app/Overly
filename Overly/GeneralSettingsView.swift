@@ -50,6 +50,8 @@ struct GeneralSettingsView: View {
                              // This might be necessary for the change to take effect immediately.
                              NSApp.activate(ignoringOtherApps: true)
                          }
+                         // Save the setting to UserDefaults
+                         settings.saveSettings()
                     }
 
                 // Interactive Hotkey Recorder

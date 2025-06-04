@@ -143,20 +143,38 @@ class WindowManager: NSObject, ObservableObject {
     }
 
     // Method to toggle the custom window's visibility
+    @MainActor
     func toggleCustomWindowVisibility() {
         // print("toggleCustomWindowVisibility called. customWindow is currently: \(customWindow == nil ? "nil" : "not nil")")
         if customWindow == nil {
             //print("customWindow is nil, creating new window.")
             // If the window hasn't been created yet, create it
+            let settings = AppSettings.shared
             let newWindow = BorderlessWindow(
-                // Adjust the width and height for the requested size (800x450)
-                contentRect: NSRect(x: 0, y: 0, width: 500, height: 600),
+                // Use saved window frame from settings
+                contentRect: settings.windowFrame,
                 styleMask: [.borderless, .resizable, .fullSizeContentView],
                 backing: .buffered,
                 defer: false
             )
 
-            newWindow.center() // Center the window initially
+            // Only center the window if it's the first time (default frame)
+            let defaultFrame = NSRect(x: 0, y: 0, width: 500, height: 600)
+            if settings.windowFrame == defaultFrame {
+                newWindow.center() // Center the window only for first launch
+            } else {
+                // Ensure the saved frame is visible on screen
+                let screenFrame = NSScreen.main?.visibleFrame ?? NSScreen.main?.frame ?? .zero
+                let adjustedFrame = settings.windowFrame
+                
+                // Adjust if window is completely off-screen
+                if adjustedFrame.maxX < screenFrame.minX || adjustedFrame.minX > screenFrame.maxX ||
+                   adjustedFrame.maxY < screenFrame.minY || adjustedFrame.minY > screenFrame.maxY {
+                    newWindow.center()
+                } else {
+                    newWindow.setFrame(adjustedFrame, display: false)
+                }
+            }
 
             // Create an NSHostingView to wrap the SwiftUI ContentView
             // ContentView will set the actions on the window in its onAppear
@@ -180,6 +198,9 @@ class WindowManager: NSObject, ObservableObject {
 
             // Store the window in the class property
             customWindow = newWindow
+            
+            // Set up window frame change notification
+            setupWindowFrameObserver()
 
             // Actions will be set on customWindow by ContentView in its onAppear
 
@@ -197,7 +218,7 @@ class WindowManager: NSObject, ObservableObject {
                 // Activate the application to ensure the window can become key
                 NSApp.activate(ignoringOtherApps: true)
                 window.makeKeyAndOrderFront(nil)
-                window.center() // Center the window every time it is shown
+                // Don't center every time - preserve the saved position
                 // Enable context-sensitive hotkeys when window becomes visible
                 enableContextHotkeys()
             }
@@ -218,6 +239,46 @@ class WindowManager: NSObject, ObservableObject {
             // Disable context-sensitive hotkeys when window becomes hidden
             disableContextHotkeys()
         }
+    }
+
+    // Method to set up window frame observer
+    private func setupWindowFrameObserver() {
+        guard let window = customWindow else { return }
+        
+        // Listen for window frame changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidResize),
+            name: NSWindow.didResizeNotification,
+            object: window
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidMove),
+            name: NSWindow.didMoveNotification,
+            object: window
+        )
+    }
+    
+    // Method called when window is resized
+    @MainActor
+    @objc private func windowDidResize(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow,
+              window == customWindow else { return }
+        
+        // Save the new frame to settings
+        AppSettings.shared.updateWindowFrame(window.frame)
+    }
+    
+    // Method called when window is moved
+    @MainActor
+    @objc private func windowDidMove(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow,
+              window == customWindow else { return }
+        
+        // Save the new frame to settings
+        AppSettings.shared.updateWindowFrame(window.frame)
     }
 
     // Clean up observers when WindowManager is deallocated
