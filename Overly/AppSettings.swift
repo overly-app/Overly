@@ -138,6 +138,9 @@ class AppSettings: ObservableObject, @unchecked Sendable {
         // Save toggle hotkey settings
         userDefaults.set(UInt16(toggleHotkeyKey.carbonKeyCode), forKey: toggleHotkeyKeyKey)
         userDefaults.set(toggleHotkeyModifiers.rawValue, forKey: toggleHotkeyModifiersKey)
+        
+        // Force synchronization to disk
+        userDefaults.synchronize()
     }
     
     // Method to update the toggle hotkey
