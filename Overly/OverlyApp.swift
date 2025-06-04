@@ -166,25 +166,7 @@ class WindowManager: NSObject, ObservableObject {
             object: nil
         )
 
-        // Create the global hotkey for Cmd + R
-        reloadHotKey = HotKey(key: .r, modifiers: [.command])
-        reloadHotKey?.keyDownHandler = { [weak self] in
-            // print("Cmd + R hotkey pressed.")
-            // print("WindowManager: Attempting to call reloadAction closure.")
-            // Call the reload action closure stored in the window
-            self?.customWindow?.reloadAction?()
-            // print("WindowManager: reloadAction closure call attempted.")
-        }
-
-        // Create the global hotkey for Cmd + /
-        nextServiceHotKey = HotKey(key: .slash, modifiers: [.command]) // Corrected key name
-        nextServiceHotKey?.keyDownHandler = { [weak self] in
-            // print("Cmd + / hotkey pressed.")
-            // print("WindowManager: Attempting to call nextServiceAction closure.")
-            // Call the switch service action closure stored in the window
-            self?.customWindow?.nextServiceAction?()
-            // print("WindowManager: nextServiceAction closure call attempted.")
-        }
+        // Don't create the hotkeys immediately - they'll be created when window becomes visible
         
         // Create a global hotkey for Cmd + , (settings shortcut)
         settingsHotKey = HotKey(key: .comma, modifiers: [.command])
@@ -257,6 +239,29 @@ class WindowManager: NSObject, ObservableObject {
         setupToggleHotkey()
     }
 
+    // Method to enable context-sensitive hotkeys when window is visible
+    private func enableContextHotkeys() {
+        // Create the global hotkey for Cmd + R
+        reloadHotKey = HotKey(key: .r, modifiers: [.command])
+        reloadHotKey?.keyDownHandler = { [weak self] in
+            // Call the reload action closure stored in the window
+            self?.customWindow?.reloadAction?()
+        }
+
+        // Create the global hotkey for Cmd + /
+        nextServiceHotKey = HotKey(key: .slash, modifiers: [.command])
+        nextServiceHotKey?.keyDownHandler = { [weak self] in
+            // Call the switch service action closure stored in the window
+            self?.customWindow?.nextServiceAction?()
+        }
+    }
+    
+    // Method to disable context-sensitive hotkeys when window is hidden
+    private func disableContextHotkeys() {
+        reloadHotKey = nil
+        nextServiceHotKey = nil
+    }
+
     // Method to toggle the custom window's visibility
     func toggleCustomWindowVisibility() {
         // print("toggleCustomWindowVisibility called. customWindow is currently: \(customWindow == nil ? "nil" : "not nil")")
@@ -313,9 +318,13 @@ class WindowManager: NSObject, ObservableObject {
                 NSApp.activate(ignoringOtherApps: true)
                 window.makeKeyAndOrderFront(nil)
                 window.center() // Center the window every time it is shown
+                // Enable context-sensitive hotkeys when window becomes visible
+                enableContextHotkeys()
             }
              else { // If the window *was* visible and is now hidden
                  //print("Window was visible, hiding.")
+                 // Disable context-sensitive hotkeys when window becomes hidden
+                 disableContextHotkeys()
                  // Optionally, you might want to resign key window status when hiding
                  // window.resignKey()
              }
@@ -326,6 +335,8 @@ class WindowManager: NSObject, ObservableObject {
     func hideCustomWindow() {
         if let window = customWindow, window.isVisible {
             window.setIsVisible(false)
+            // Disable context-sensitive hotkeys when window becomes hidden
+            disableContextHotkeys()
         }
     }
 
