@@ -136,6 +136,7 @@ class WindowManager: NSObject, ObservableObject {
     private var hotKey: HotKey?
     private var reloadHotKey: HotKey?
     private var nextServiceHotKey: HotKey?
+    private var settingsHotKey: HotKey?
 
     // Closures to trigger actions on the visible ContentView
     // These closures will be set by the visible ContentView instance
@@ -154,6 +155,14 @@ class WindowManager: NSObject, ObservableObject {
             self,
             selector: #selector(hotkeySettingsChanged),
             name: NSNotification.Name("HotkeySettingsChanged"),
+            object: nil
+        )
+        
+        // Listen for new windows opening (like settings window)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(windowDidBecomeKey),
+            name: NSWindow.didBecomeKeyNotification,
             object: nil
         )
 
@@ -175,6 +184,13 @@ class WindowManager: NSObject, ObservableObject {
             // Call the switch service action closure stored in the window
             self?.customWindow?.nextServiceAction?()
             // print("WindowManager: nextServiceAction closure call attempted.")
+        }
+        
+        // Create a global hotkey for Cmd + , (settings shortcut)
+        settingsHotKey = HotKey(key: .comma, modifiers: [.command])
+        settingsHotKey?.keyDownHandler = { [weak self] in
+            // Hide the floating window when Cmd+, is pressed (settings shortcut)
+            self?.hideCustomWindow()
         }
     }
     
@@ -210,6 +226,24 @@ class WindowManager: NSObject, ObservableObject {
     @MainActor
     @objc private func hotkeySettingsChanged() {
         setupToggleHotkey()
+    }
+
+    // Method called when a window becomes key (like settings window)
+    @objc private func windowDidBecomeKey(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+        
+        // Check if this is not our custom window and hide our floating window
+        if window != customWindow {
+            // Check if it's likely a settings window by checking the window title or class
+            let windowTitle = window.title
+            let windowClass = String(describing: type(of: window))
+            
+            // Hide our floating window if a settings-like window opens
+            if windowTitle.contains("Settings") || windowTitle.contains("Preferences") || 
+               windowClass.contains("Settings") || windowClass.contains("Preferences") {
+                hideCustomWindow()
+            }
+        }
     }
 
     // Method to temporarily disable the global hotkey (for onboarding)
@@ -293,6 +327,11 @@ class WindowManager: NSObject, ObservableObject {
         if let window = customWindow, window.isVisible {
             window.setIsVisible(false)
         }
+    }
+
+    // Clean up observers when WindowManager is deallocated
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     // We no longer need the perform helper methods here
