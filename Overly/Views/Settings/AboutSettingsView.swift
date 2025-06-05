@@ -123,70 +123,7 @@ struct AboutSettingsView: View {
                     .foregroundColor(.primary)
             }
             
-            Section {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Image(systemName: "heart")
-                            .foregroundColor(.red)
-                            .font(.system(size: 16))
-                        
-                        Text("Special thanks to:")
-                            .font(.system(size: 14, weight: .medium))
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("•")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                            Text("The SwiftUI community for inspiration and guidance")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        HStack {
-                            Text("•")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                            Text("HotKey library by Sam Soffes for keyboard shortcuts")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        HStack {
-                            Text("•")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                            Text("All the AI providers for making this possible")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        HStack {
-                            Text("•")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                            Text("Beta testers and early users for feedback")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(NSColor.separatorColor), lineWidth: 1)
-                )
-            } header: {
-                Text("Acknowledgments")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-            }
-            
+
             Section {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {

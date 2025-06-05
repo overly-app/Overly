@@ -35,11 +35,6 @@ struct SettingsWindowView: View {
                 }
                 .tag("Shortcuts")
                 
-                NavigationLink(value: "Privacy") {
-                    Label("Privacy", systemImage: "hand.raised")
-                }
-                .tag("Privacy")
-                
                 NavigationLink(value: "About") {
                     Label("About", systemImage: "info.circle")
                 }
@@ -59,8 +54,6 @@ struct SettingsWindowView: View {
                     AppearanceSettingsView()
                 case "Shortcuts":
                     ShortcutsSettingsView()
-                case "Privacy":
-                    PrivacySettingsView()
                 case "About":
                     AboutSettingsView()
                 default:

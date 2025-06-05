@@ -9,8 +9,6 @@ import SwiftUI
 
 struct AppearanceSettingsView: View {
     @ObservedObject var settings = AppSettings.shared
-    @AppStorage("windowOpacity") var windowOpacity: Double = 0.95
-    @AppStorage("cornerRadius") var cornerRadius: Double = 12.0
     @AppStorage("showInDock") var showInDock: Bool = false
     
     var body: some View {
@@ -63,57 +61,7 @@ struct AppearanceSettingsView: View {
                     .foregroundColor(.primary)
             }
             
-            Section {
-                VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Window Opacity:")
-                                .font(.system(size: 14))
-                                .foregroundColor(.secondary)
-                            
-                            Spacer()
-                            
-                            Text("\(Int(windowOpacity * 100))%")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.primary)
-                        }
-                        
-                        Slider(value: $windowOpacity, in: 0.5...1.0, step: 0.05)
-                            .accentColor(.blue)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Corner Radius:")
-                                .font(.system(size: 14))
-                                .foregroundColor(.secondary)
-                            
-                            Spacer()
-                            
-                            Text("\(Int(cornerRadius))px")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.primary)
-                        }
-                        
-                        Slider(value: $cornerRadius, in: 0...20, step: 1)
-                            .accentColor(.blue)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(NSColor.separatorColor), lineWidth: 1)
-                )
-            } header: {
-                Text("Window Appearance")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-            }
-            
+
             Section {
                 VStack(alignment: .leading, spacing: 12) {
                     Toggle(isOn: $showInDock) {
