@@ -260,6 +260,14 @@ class WindowManager: NSObject, ObservableObject {
         }
     }
 
+    // Method to ensure the custom window is focused and brought to front
+    func focusCustomWindow() {
+        if let window = customWindow, window.isVisible {
+            NSApp.activate(ignoringOtherApps: true)
+            window.makeKeyAndOrderFront(nil)
+        }
+    }
+
     // Method to set up window frame observer
     private func setupWindowFrameObserver() {
         guard let window = customWindow else { return }

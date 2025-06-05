@@ -47,6 +47,8 @@ struct ContentView: View {
                 CommandPalette(isVisible: $showCommandPalette, onNavigate: navigateWebView)
             }
             .onKeyPress(.init("/")) {
+                // Ensure window is focused and brought to front using WindowManager
+                windowManager.focusCustomWindow()
                 showCommandPalette = true
                 return .handled
             }
