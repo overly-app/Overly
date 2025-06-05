@@ -418,6 +418,26 @@ class WindowManager: NSObject, ObservableObject {
             window.orderFrontRegardless()
         }
         
+        // Enhanced activation for non-dockless mode
+        if !isDockless {
+            print("Non-dockless mode: ensuring strong activation")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                if let window = self.customWindow {
+                    NSApp.activate(ignoringOtherApps: true)
+                    window.makeKeyAndOrderFront(nil)
+                    window.orderFrontRegardless()
+                    
+                    // Ensure window is actually key
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        if !window.isKeyWindow {
+                            print("Window is not key, forcing it to become key")
+                            window.makeKey()
+                        }
+                    }
+                }
+            }
+        }
+        
         // Revert to accessory policy if we were dock-less
         if isDockless {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -426,8 +446,9 @@ class WindowManager: NSObject, ObservableObject {
             }
         }
         
-        // Navigate in the WebView after a longer delay to ensure window is ready
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        // Navigate in the WebView after ensuring window is ready
+        let navigationDelay = isDockless ? 0.3 : 0.2
+        DispatchQueue.main.asyncAfter(deadline: .now() + navigationDelay) {
             print("Attempting to navigate WebView")
             if let window = self.customWindow,
                let webView = window.contentView?.findSubview(ofType: WKWebView.self) {
