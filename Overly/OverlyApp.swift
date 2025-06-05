@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import SettingsKit
 
 @main
 struct OverlyApp: App {
@@ -33,10 +32,8 @@ struct OverlyApp: App {
             
             Divider()
             
-            SettingsLink {
-                HStack {
-                    Text("Settings")
-                }
+            Button("Settings") {
+                SettingsManager.shared.openSettings()
             }
             
             Button("Check for Updates") {
@@ -57,27 +54,6 @@ struct OverlyApp: App {
             Image("MenuBarIcon")
                 .renderingMode(.template)
                 .frame(width: 18, height: 18)
-        }
-        .settings(design: .sidebar) {
-            SettingsTab(.new(title: "General", image: .init(systemName: "gearshape")), id: "general", color: .gray) {
-                SettingsSubtab(.noSelection, id: "general") { 
-                    GeneralSettingsView()
-                        .frame(width: 500)
-                        .fixedSize()
-                        .padding()
-                }
-            }
-            .frame()
-            
-            SettingsTab(.new(title: "Providers", image: .init(systemName: "puzzlepiece")), id: "providers", color: .blue) {
-                SettingsSubtab(.noSelection, id: "providers") { 
-                    ProviderSettingsView()
-                        .frame(width: 500)
-                        .fixedSize()
-                        .padding()
-                }
-            }
-            .frame()
         }
     }
 }

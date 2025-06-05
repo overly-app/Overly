@@ -23,8 +23,7 @@ struct GitHubRelease: Decodable {
 }
 
 struct GeneralSettingsView: View {
-    @ObservedObject var settings = AppSettings.shared // Use the shared settings instance
-    
+    @ObservedObject var settings = AppSettings.shared
     @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
     
     // State variables for the update check alert
@@ -36,71 +35,122 @@ struct GeneralSettingsView: View {
     @State private var isRecordingHotkey = false
     
     var body: some View {
-        Form { // Use a standard SwiftUI Form
-            Section(header: Text("General")) { // Use a standard SwiftUI Section
-                // Show in Dock Toggle
+        Form {
+            // System Features Section
+            Section {
                 Toggle("Show in Dock", isOn: $settings.showInDock)
                     .onChange(of: settings.showInDock) { _, newValue in
-                        // Explicitly set the activation policy when the toggle changes
-                         if newValue {
-                             NSApp.setActivationPolicy(.regular)
-                         } else {
-                             NSApp.setActivationPolicy(.accessory)
-                             // Explicitly activate the application when hiding the dock icon
-                             // This might be necessary for the change to take effect immediately.
-                             NSApp.activate(ignoringOtherApps: true)
-                         }
-                         // Save the setting to UserDefaults
-                         settings.saveSettings()
+                        if newValue {
+                            NSApp.setActivationPolicy(.regular)
+                        } else {
+                            NSApp.setActivationPolicy(.accessory)
+                            NSApp.activate(ignoringOtherApps: true)
+                        }
+                        settings.saveSettings()
                     }
-
-                // Interactive Hotkey Recorder
+            } header: {
+                Text("System Features")
+            }
+            
+            // Hotkey Configuration Section
+            Section {
                 HStack {
+                    Text("Toggle Hotkey")
+                    Spacer()
                     KeybindRecorderView(
                         key: $settings.toggleHotkeyKey,
                         modifiers: $settings.toggleHotkeyModifiers,
                         isRecording: $isRecordingHotkey,
-                        showLabel: true
+                        showLabel: false
                     )
+                    .frame(width: 120)
                     
                     Button(isRecordingHotkey ? "Cancel" : "Change") {
                         isRecordingHotkey.toggle()
                     }
-                    .foregroundColor(isRecordingHotkey ? .red : .blue)
+                    .controlSize(.small)
+                    .foregroundColor(isRecordingHotkey ? .red : .accentColor)
                 }
-
-                // Reset Onboarding Button
-                Button("Reset Onboarding") {
-                    hasCompletedOnboarding = false
+            } header: {
+                Text("Keyboard Shortcuts")
+            } footer: {
+                Text("Set a global hotkey to quickly toggle the Overly window")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            // App Information Section
+            Section {
+                HStack {
+                    Text("Current Version")
+                    Spacer()
+                    if let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+                        Text(currentVersion)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("Unknown")
+                            .foregroundColor(.secondary)
+                    }
                 }
-
-                // Check for Updates Button
+                
                 Button("Check for Updates") {
-                    Task { // Use a Task to call the async function
+                    Task {
                         await checkForUpdates()
                     }
                 }
-
-                // Current Version Display
-                if let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+                .frame(maxWidth: .infinity, alignment: .leading)
+                
+                Button("Reset Onboarding") {
+                    hasCompletedOnboarding = false
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } header: {
+                Text("App Information")
+            }
+            
+            // About Section
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("Current Version:")
+                        Image("MenuBarIcon")
+                            .resizable()
+                            .frame(width: 32, height: 32)
+                        VStack(alignment: .leading) {
+                            Text("Overly")
+                                .font(.headline)
+                            Text("AI Chat Interface for macOS")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                         Spacer()
-                        Text("\(currentVersion)")
+                    }
+                    
+                    Text("A beautiful, native macOS application for seamless AI conversations with multiple providers.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.leading)
+                }
+                .padding(.vertical, 4)
+                
+                Button("Visit GitHub Repository") {
+                    if let url = URL(string: "https://github.com/hypackel/Overly") {
+                        NSWorkspace.shared.open(url)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } header: {
+                Text("About")
             }
         }
-        .padding()
+        .formStyle(.grouped)
+        .navigationTitle("General")
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        // Add the alert modifier
         .alert(isPresented: $showingUpdateAlert) {
             if let url = updateURL {
                 Alert(
                     title: Text("Update Available"),
                     message: Text(updateMessage),
                     primaryButton: .default(Text("Download Update")) {
-                        // Open the release page in the browser
                         NSWorkspace.shared.open(url)
                     },
                     secondaryButton: .cancel()
@@ -129,7 +179,6 @@ struct GeneralSettingsView: View {
             let decoder = JSONDecoder()
             let release = try decoder.decode(GitHubRelease.self, from: data)
             
-            // Get the current app version
             guard let currentVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String else {
                 updateMessage = "Could not determine current app version."
                 updateURL = nil
@@ -137,29 +186,24 @@ struct GeneralSettingsView: View {
                 return
             }
             
-            // Replace simple string comparison with robust version comparison
             if compareVersions(release.tagName, currentVersion) == .orderedDescending {
-                // Newer version available
                 updateMessage = "Version \(release.name) (\(release.tagName)) is available."
                 updateURL = release.htmlUrl
             } else {
-                // App is up to date
                 updateMessage = "Your app is up to date (Version \(currentVersion))."
                 updateURL = nil
             }
             
         } catch {
-            // Handle errors during fetch or decode
             updateMessage = "Failed to check for updates: \(error.localizedDescription)"
             updateURL = nil
         }
         
-        showingUpdateAlert = true // Show the alert after the check
+        showingUpdateAlert = true
     }
     
     // Helper function for robust semantic version comparison
     private func compareVersions(_ version1: String, _ version2: String) -> ComparisonResult {
-        // Remove leading 'v' if present and split by '.'
         let components1 = version1.trimmingCharacters(in: CharacterSet(charactersIn: "vV")).split(separator: ".").map { Int($0) ?? 0 }
         let components2 = version2.trimmingCharacters(in: CharacterSet(charactersIn: "vV")).split(separator: ".").map { Int($0) ?? 0 }
         
@@ -173,12 +217,10 @@ struct GeneralSettingsView: View {
                 return .orderedAscending
             } else if v1 > v2 {
                 return .orderedDescending
-            } else if v1 < v2 {
-                return .orderedAscending
             }
         }
         
-        return .orderedSame // Versions are equal
+        return .orderedSame
     }
 }
 

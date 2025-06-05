@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import SettingsKit
 
 struct ServiceDropdownView: View {
     @Binding var selectedProvider: ChatProvider?
@@ -64,7 +63,11 @@ struct ServiceDropdownView: View {
                 }
             }
             
-            SettingsLink {
+            Button(action: {
+                SettingsManager.shared.openSettings()
+                windowManager?.hideCustomWindow()
+                dismiss()
+            }) {
                 HStack {
                     Image(systemName: "gearshape")
                         .resizable()
@@ -80,10 +83,6 @@ struct ServiceDropdownView: View {
                 .cornerRadius(4)
             }
             .buttonStyle(.plain)
-            .onTapGesture {
-                windowManager?.hideCustomWindow()
-                dismiss()
-            }
         }
         .padding(8)
         .background(Color.gray.opacity(0.2))
