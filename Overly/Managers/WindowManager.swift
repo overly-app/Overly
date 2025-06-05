@@ -189,16 +189,16 @@ class WindowManager: NSObject, ObservableObject {
         nextServiceHotKey = nil
     }
 
-    // Method to toggle the custom window's visibility
+    // Method to ensure the custom window is always shown (not toggle)
     @MainActor
-    func toggleCustomWindowVisibility() {
-        // print("toggleCustomWindowVisibility called. customWindow is currently: \(customWindow == nil ? "nil" : "not nil")")
+    func showCustomWindow() {
+        print("ShowCustomWindow called")
+        
         if customWindow == nil {
-            //print("customWindow is nil, creating new window.")
-            // If the window hasn't been created yet, create it
+            print("Creating new window")
+            // Create the window if it doesn't exist
             let settings = AppSettings.shared
             let newWindow = BorderlessWindow(
-                // Use saved window frame from settings
                 contentRect: settings.windowFrame,
                 styleMask: [.borderless, .resizable, .fullSizeContentView],
                 backing: .buffered,
@@ -208,13 +208,11 @@ class WindowManager: NSObject, ObservableObject {
             // Only center the window if it's the first time (default frame)
             let defaultFrame = NSRect(x: 0, y: 0, width: 500, height: 600)
             if settings.windowFrame == defaultFrame {
-                newWindow.center() // Center the window only for first launch
+                newWindow.center()
             } else {
-                // Ensure the saved frame is visible on screen
                 let screenFrame = NSScreen.main?.visibleFrame ?? NSScreen.main?.frame ?? .zero
                 let adjustedFrame = settings.windowFrame
                 
-                // Adjust if window is completely off-screen
                 if adjustedFrame.maxX < screenFrame.minX || adjustedFrame.minX > screenFrame.maxX ||
                    adjustedFrame.maxY < screenFrame.minY || adjustedFrame.minY > screenFrame.maxY {
                     newWindow.center()
@@ -223,15 +221,11 @@ class WindowManager: NSObject, ObservableObject {
                 }
             }
 
-            // Create an NSHostingView to wrap the SwiftUI ContentView
-            // ContentView will set the actions on the window in its onAppear
-            // Set the ContentView as the root view of the HostingView once
-            let contentView = ContentView(window: newWindow, windowManager: self) // Pass windowManager
-            let hostingView = NSHostingView(rootView: AnyView(contentView)) // Wrap in AnyView
-            // Set the HostingView as the contentView of the MaskedVisualEffectView
+            let contentView = ContentView(window: newWindow, windowManager: self)
+            let hostingView = NSHostingView(rootView: AnyView(contentView))
+            
             if let maskedContentView = newWindow.contentView as? MaskedVisualEffectView {
                  maskedContentView.addSubview(hostingView)
-                 // Set constraints to make hostingView fill the maskedContentView
                  hostingView.translatesAutoresizingMaskIntoConstraints = false
                  NSLayoutConstraint.activate([
                      hostingView.topAnchor.constraint(equalTo: maskedContentView.topAnchor),
@@ -239,46 +233,24 @@ class WindowManager: NSObject, ObservableObject {
                      hostingView.leadingAnchor.constraint(equalTo: maskedContentView.leadingAnchor),
                      hostingView.trailingAnchor.constraint(equalTo: maskedContentView.trailingAnchor)
                  ])
-             } else { // Fallback if contentView is not MaskedVisualEffectView
-                 newWindow.contentView = hostingView // Set directly if necessary
+             } else {
+                 newWindow.contentView = hostingView
              }
 
-            // Store the window in the class property
             customWindow = newWindow
-            
-            // Set up window frame change notification
             setupWindowFrameObserver()
-
-            // Actions will be set on customWindow by ContentView in its onAppear
-
         }
-
-        // Now that we are sure customWindow is not nil, toggle its visibility
+        
+        // Always ensure the window is visible and focused
         if let window = customWindow {
-            let isVisible = window.isVisible
-            // print("customWindow is not nil. Current visibility: \(isVisible).")
-            window.setIsVisible(!isVisible)
-
-            // Always attempt to make it key and order front when showing
-            if !isVisible { // If the window *was* hidden and is now visible
-                // print("Window was hidden, making visible and ordering front.")
-                // Activate the application to ensure the window can become key
-                NSApp.activate(ignoringOtherApps: true)
-                window.makeKeyAndOrderFront(nil)
-                // Don't center every time - preserve the saved position
-                // Enable context-sensitive hotkeys when window becomes visible
-                enableContextHotkeys()
-            }
-             else { // If the window *was* visible and is now hidden
-                 //print("Window was visible, hiding.")
-                 // Disable context-sensitive hotkeys when window becomes hidden
-                 disableContextHotkeys()
-                 // Optionally, you might want to resign key window status when hiding
-                 // window.resignKey()
-             }
+            print("Making window visible and focused")
+            window.setIsVisible(true)
+            NSApp.activate(ignoringOtherApps: true)
+            window.makeKeyAndOrderFront(nil)
+            enableContextHotkeys()
         }
     }
-    
+
     // Method to hide the custom window (for settings)
     func hideCustomWindow() {
         if let window = customWindow, window.isVisible {
@@ -353,20 +325,48 @@ class WindowManager: NSObject, ObservableObject {
     // Navigate to URL in the main window's WebView
     @MainActor
     private func navigateToURL(_ url: URL) {
+        print("NavigateToURL called with: \(url)")
+        
         // First dismiss the command palette window
         commandPaletteWindow?.orderOut(nil)
         
-        // Ensure the main window is visible
-        if customWindow == nil || !customWindow!.isVisible {
-            toggleCustomWindowVisibility()
+        // Ensure the main window is visible - always show it, don't toggle
+        if customWindow == nil {
+            print("CustomWindow is nil, creating new window")
+            // Create the window if it doesn't exist
+            showCustomWindow()
+            // After creating, ensure it's visible and focused
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                if let window = self.customWindow {
+                    print("Window created, making it visible and key")
+                    NSApp.activate(ignoringOtherApps: true)
+                    window.makeKeyAndOrderFront(nil)
+                    window.setIsVisible(true)
+                }
+            }
+        } else if !customWindow!.isVisible {
+            print("CustomWindow exists but is hidden, showing it")
+            // Show the window if it exists but is hidden
+            customWindow!.setIsVisible(true)
+            NSApp.activate(ignoringOtherApps: true)
+            customWindow!.makeKeyAndOrderFront(nil)
+            enableContextHotkeys()
+        } else {
+            print("CustomWindow is already visible, focusing it")
+            // Window is already visible, just make sure it's focused
+            focusCustomWindow()
         }
         
-        // Navigate in the WebView after a short delay to ensure window is ready
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        // Navigate in the WebView after a longer delay to ensure window is ready
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            print("Attempting to navigate WebView")
             if let window = self.customWindow,
                let webView = window.contentView?.findSubview(ofType: WKWebView.self) {
+                print("Found WebView, loading URL: \(url)")
                 let request = URLRequest(url: url)
                 webView.load(request)
+            } else {
+                print("Could not find WebView in window")
             }
         }
     }
@@ -416,5 +416,24 @@ class WindowManager: NSObject, ObservableObject {
         NotificationCenter.default.removeObserver(self)
     }
 
-    // We no longer need the perform helper methods here
+    // Method to toggle the custom window's visibility
+    @MainActor
+    func toggleCustomWindowVisibility() {
+        if customWindow == nil {
+            // If window doesn't exist, create and show it
+            showCustomWindow()
+        } else if let window = customWindow {
+            let isVisible = window.isVisible
+            window.setIsVisible(!isVisible)
+
+            // Always attempt to make it key and order front when showing
+            if !isVisible { // If the window *was* hidden and is now visible
+                NSApp.activate(ignoringOtherApps: true)
+                window.makeKeyAndOrderFront(nil)
+                enableContextHotkeys()
+            } else { // If the window *was* visible and is now hidden
+                disableContextHotkeys()
+            }
+        }
+    }
 } 
