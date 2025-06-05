@@ -46,11 +46,15 @@ struct ContentView: View {
                 // Command palette overlay
                 CommandPalette(isVisible: $showCommandPalette, onNavigate: navigateWebView)
             }
+            // TEMPORARILY DISABLED: "/" key command palette in window context
+            // Uncomment the block below to re-enable "/" command palette when window is focused
+            /*
             .onKeyPress(.init("/")) {
                 // Use the shared method to show command palette
                 showCommandPaletteView()
                 return .handled
             }
+            */
         } else {
             OnboardingView()
         }
@@ -61,9 +65,6 @@ struct ContentView: View {
             window.reloadAction = { self.reloadWebView() }
             window.nextServiceAction = { self.selectNextService() }
         }
-        
-        // Set the command palette action in WindowManager
-        windowManager.showCommandPaletteAction = { self.showCommandPaletteView() }
     }
     
     private func initializeSelectedProvider() {

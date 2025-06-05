@@ -18,18 +18,14 @@ struct StandaloneCommandPalette: View {
     let onNavigate: (URL) -> Void
     @ObservedObject var settings = AppSettings.shared
     
-    // All available commands mapped to service IDs
-    private let allCommands = [
-        CommandInfo(command: "/t3", description: "Open T3 chat with query", placeholder: "Type your question...", serviceId: "T3 Chat"),
-        CommandInfo(command: "/chat", description: "Open ChatGPT with query", placeholder: "Type your question...", serviceId: "ChatGPT"),
-        CommandInfo(command: "/claude", description: "Open Claude with query", placeholder: "Type your question...", serviceId: "Claude"),
-        CommandInfo(command: "/perplexity", description: "Open Perplexity with query", placeholder: "Type your question...", serviceId: "Perplexity"),
-        CommandInfo(command: "/copilot", description: "Open Copilot with query", placeholder: "Type your question...", serviceId: "Copilot")
-    ]
+    // Use the command navigation handler
+    private var navigationHandler: CommandNavigationHandler {
+        CommandNavigationHandler(onNavigate: onNavigate)
+    }
     
     // Available commands filtered by enabled services
     private var availableCommands: [CommandInfo] {
-        return allCommands.filter { commandInfo in
+        return CommandNavigationHandler.allCommands.filter { commandInfo in
             return settings.activeProviderIds.contains(commandInfo.serviceId ?? "")
         }
     }
@@ -106,81 +102,15 @@ struct StandaloneCommandPalette: View {
             
             // Command hints and autocomplete or history
             if shouldShowHistory && !commandHistory.history.isEmpty {
-                // Show history
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Recent Commands")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
-                    
-                    ForEach(Array(commandHistory.history.enumerated()), id: \.element) { index, historyCommand in
-                        HStack {
-                            Text(historyCommand)
-                                .font(.system(size: 13, design: .monospaced))
-                                .foregroundColor(isInHistoryMode && index == historyIndex ? .white : .primary)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(isInHistoryMode && index == historyIndex ? Color.accentColor : Color.clear)
-                                .cornerRadius(5)
-                            
-                            Spacer()
-                            
-                            if isInHistoryMode && index == historyIndex {
-                                Text("ENTER")
-                                    .font(.system(size: 10, design: .monospaced))
-                                    .foregroundColor(.secondary)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.secondary.opacity(0.2))
-                                    .cornerRadius(3)
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 2)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            command = historyCommand
-                            executeCommand(historyCommand)
-                        }
-                    }
-                }
-                .padding(.vertical, 8)
-                .background(.regularMaterial)
-                .cornerRadius(10)
-                .padding(.top, 3)
+                buildHistoryView()
             } else if !filteredCommands.isEmpty {
-                // Show autocomplete
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(Array(filteredCommands.enumerated()), id: \.element.command) { index, commandInfo in
-                        CommandHint(
-                            commandInfo: commandInfo,
-                            currentCommand: command,
-                            currentQuery: currentQuery,
-                            isTypingQuery: isTypingQuery,
-                            isHighlighted: shouldHighlight(commandInfo, index: index)
-                        )
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(.regularMaterial)
-                .cornerRadius(10)
-                .padding(.top, 3)
+                buildAutocompleteView()
             }
         }
         .frame(maxWidth: 600, maxHeight: 380)
         .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
         .onAppear {
-            selectedIndex = 0
-            historyIndex = -1
-            isInHistoryMode = false
-            command = "/"
-            
-            // Ensure focus with a small delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                isInputFocused = true
-            }
+            setupCommandPalette()
         }
         .onKeyPress(.escape) {
             hideCommandPalette()
@@ -197,6 +127,82 @@ struct StandaloneCommandPalette: View {
         .onKeyPress(.downArrow) {
             navigateDown()
             return .handled
+        }
+    }
+    
+    private func buildHistoryView() -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Recent Commands")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+            
+            ForEach(Array(commandHistory.history.enumerated()), id: \.element) { index, historyCommand in
+                HStack {
+                    Text(historyCommand)
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundColor(isInHistoryMode && index == historyIndex ? .white : .primary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(isInHistoryMode && index == historyIndex ? Color.accentColor : Color.clear)
+                        .cornerRadius(5)
+                    
+                    Spacer()
+                    
+                    if isInHistoryMode && index == historyIndex {
+                        Text("ENTER")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.secondary.opacity(0.2))
+                            .cornerRadius(3)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 2)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    command = historyCommand
+                    executeCommand(historyCommand)
+                }
+            }
+        }
+        .padding(.vertical, 8)
+        .background(.regularMaterial)
+        .cornerRadius(10)
+        .padding(.top, 3)
+    }
+    
+    private func buildAutocompleteView() -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(filteredCommands.enumerated()), id: \.element.command) { index, commandInfo in
+                CommandHint(
+                    commandInfo: commandInfo,
+                    currentCommand: command,
+                    currentQuery: currentQuery,
+                    isTypingQuery: isTypingQuery,
+                    isHighlighted: shouldHighlight(commandInfo, index: index)
+                )
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(.regularMaterial)
+        .cornerRadius(10)
+        .padding(.top, 3)
+    }
+    
+    private func setupCommandPalette() {
+        selectedIndex = 0
+        historyIndex = -1
+        isInHistoryMode = false
+        command = "/"
+        
+        // Ensure focus with a small delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            isInputFocused = true
         }
     }
     
@@ -280,7 +286,7 @@ struct StandaloneCommandPalette: View {
         if shouldShowHistory && isInHistoryMode && historyIndex >= 0 && historyIndex < commandHistory.history.count {
             let selectedHistoryCommand = commandHistory.history[historyIndex]
             commandHistory.addCommand(selectedHistoryCommand) // Move to front
-            executeCommandLogic(selectedHistoryCommand)
+            navigationHandler.executeCommand(selectedHistoryCommand)
             hideCommandPalette()
             return
         }
@@ -288,116 +294,8 @@ struct StandaloneCommandPalette: View {
         // Add to history before executing
         commandHistory.addCommand(trimmedCommand)
         
-        executeCommandLogic(trimmedCommand)
+        navigationHandler.executeCommand(trimmedCommand)
         hideCommandPalette()
-    }
-    
-    private func executeCommandLogic(_ command: String) {
-        // Track if command was executed successfully
-        var commandExecuted = false
-        
-        if command.hasPrefix("/t3 ") {
-            let query = String(command.dropFirst(4))
-            navigateToT3(with: query)
-            commandExecuted = true
-        } else if command == "/t3" {
-            navigateToT3(with: "")
-            commandExecuted = true
-        } else if command.hasPrefix("/chat ") {
-            let query = String(command.dropFirst(6))
-            navigateToChatGPT(with: query)
-            commandExecuted = true
-        } else if command == "/chat" {
-            navigateToChatGPT(with: "")
-            commandExecuted = true
-        } else if command.hasPrefix("/claude ") {
-            let query = String(command.dropFirst(8))
-            navigateToClaude(with: query)
-            commandExecuted = true
-        } else if command == "/claude" {
-            navigateToClaude(with: "")
-            commandExecuted = true
-        } else if command.hasPrefix("/perplexity ") {
-            let query = String(command.dropFirst(12))
-            navigateToPerplexity(with: query)
-            commandExecuted = true
-        } else if command == "/perplexity" {
-            navigateToPerplexity(with: "")
-            commandExecuted = true
-        } else if command.hasPrefix("/copilot ") {
-            let query = String(command.dropFirst(9))
-            navigateToCopilot(with: query)
-            commandExecuted = true
-        } else if command == "/copilot" {
-            navigateToCopilot(with: "")
-            commandExecuted = true
-        }
-        
-        // If command was executed successfully, clear the field and close window
-        if commandExecuted {
-            self.command = ""
-            hideCommandPalette()
-        }
-    }
-    
-    private func navigateToT3(with query: String) {
-        var urlString = "https://www.t3.chat/new"
-        if !query.isEmpty {
-            if let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
-                urlString += "?q=\(encodedQuery)"
-            }
-        }
-        if let url = URL(string: urlString) {
-            onNavigate(url)
-        }
-    }
-    
-    private func navigateToChatGPT(with query: String) {
-        var urlString = "https://chat.openai.com/"
-        if !query.isEmpty {
-            if let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
-                urlString += "?q=\(encodedQuery)"
-            }
-        }
-        if let url = URL(string: urlString) {
-            onNavigate(url)
-        }
-    }
-    
-    private func navigateToClaude(with query: String) {
-        var urlString = "https://claude.ai/new"
-        if !query.isEmpty {
-            if let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
-                urlString += "?q=\(encodedQuery)"
-            }
-        }
-        if let url = URL(string: urlString) {
-            onNavigate(url)
-        }
-    }
-    
-    private func navigateToPerplexity(with query: String) {
-        var urlString = "https://www.perplexity.ai/search"
-        if !query.isEmpty {
-            if let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
-                urlString += "?q=\(encodedQuery)"
-            }
-        }
-        if let url = URL(string: urlString) {
-            onNavigate(url)
-        }
-    }
-    
-    private func navigateToCopilot(with query: String) {
-        var urlString = "https://copilot.microsoft.com/"
-        if !query.isEmpty {
-            if let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
-                urlString += "?q=\(encodedQuery)"
-            }
-        }
-        if let url = URL(string: urlString) {
-            onNavigate(url)
-        }
     }
 }
 
