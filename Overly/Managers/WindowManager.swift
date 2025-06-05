@@ -9,22 +9,42 @@ import SwiftUI
 import AppKit
 import Combine
 import HotKey
+import WebKit
+
+// Custom window class for command palette that ensures proper key handling
+class CommandPaletteWindow: NSWindow {
+    override var canBecomeKey: Bool {
+        return true
+    }
+    
+    override var canBecomeMain: Bool {
+        return true
+    }
+    
+    override func keyDown(with event: NSEvent) {
+        // Let SwiftUI handle the key events first
+        super.keyDown(with: event)
+    }
+}
 
 // Class to manage the window and hotkey
 class WindowManager: NSObject, ObservableObject {
     static let shared = WindowManager()
     
     private var customWindow: BorderlessWindow? // Use BorderlessWindow type
+    private var commandPaletteWindow: CommandPaletteWindow? // Separate window for command palette
     private var hotKey: HotKey?
     private var reloadHotKey: HotKey?
     private var nextServiceHotKey: HotKey?
     private var settingsHotKey: HotKey?
+    private var commandPaletteHotKey: HotKey?
     private var isHotkeyDisabled = false // Track if hotkey is intentionally disabled
 
     // Closures to trigger actions on the visible ContentView
     // These closures will be set by the visible ContentView instance
     private var reloadWebViewAction: (() -> Void)?
     private var switchToNextServiceAction: (() -> Void)?
+    var showCommandPaletteAction: (() -> Void)?
 
     override init() {
         super.init()
@@ -56,6 +76,14 @@ class WindowManager: NSObject, ObservableObject {
         settingsHotKey?.keyDownHandler = { [weak self] in
             // Hide the floating window when Cmd+, is pressed (settings shortcut)
             self?.hideCustomWindow()
+        }
+        
+        // Create a global hotkey for Option + Space (command palette)
+        commandPaletteHotKey = HotKey(key: .space, modifiers: [.option])
+        commandPaletteHotKey?.keyDownHandler = { [weak self] in
+            Task { @MainActor in
+                self?.showCommandPaletteGlobally()
+            }
         }
     }
     
@@ -265,6 +293,81 @@ class WindowManager: NSObject, ObservableObject {
         if let window = customWindow, window.isVisible {
             NSApp.activate(ignoringOtherApps: true)
             window.makeKeyAndOrderFront(nil)
+        }
+    }
+
+    // Method to show command palette globally (Option+Space)
+    @MainActor
+    func showCommandPaletteGlobally() {
+        // Toggle behavior: if window is visible, hide it; if hidden, show it
+        if let window = commandPaletteWindow, window.isVisible {
+            // Hide the window if it's already visible
+            window.orderOut(nil)
+        } else {
+            // Create or show the standalone command palette window
+            if commandPaletteWindow == nil {
+                createCommandPaletteWindow()
+            }
+            
+            if let window = commandPaletteWindow {
+                NSApp.activate(ignoringOtherApps: true)
+                window.makeKeyAndOrderFront(nil)
+                
+                // Ensure the window can receive keyboard events
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    window.makeKey()
+                }
+            }
+        }
+    }
+
+    // Create a standalone command palette window
+    @MainActor
+    private func createCommandPaletteWindow() {
+        let windowFrame = NSRect(x: 0, y: 0, width: 600, height: 400)
+        
+        let window = CommandPaletteWindow(
+            contentRect: windowFrame,
+            styleMask: [.borderless, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        
+        window.isOpaque = false
+        window.backgroundColor = NSColor.clear
+        window.level = .floating
+        window.acceptsMouseMovedEvents = true
+        window.center()
+        
+        // Create the command palette view
+        let commandPaletteView = StandaloneCommandPalette { [weak self] url in
+            self?.navigateToURL(url)
+        }
+        
+        let hostingView = NSHostingView(rootView: commandPaletteView)
+        window.contentView = hostingView
+        
+        commandPaletteWindow = window
+    }
+    
+    // Navigate to URL in the main window's WebView
+    @MainActor
+    private func navigateToURL(_ url: URL) {
+        // First dismiss the command palette window
+        commandPaletteWindow?.orderOut(nil)
+        
+        // Ensure the main window is visible
+        if customWindow == nil || !customWindow!.isVisible {
+            toggleCustomWindowVisibility()
+        }
+        
+        // Navigate in the WebView after a short delay to ensure window is ready
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            if let window = self.customWindow,
+               let webView = window.contentView?.findSubview(ofType: WKWebView.self) {
+                let request = URLRequest(url: url)
+                webView.load(request)
+            }
         }
     }
 

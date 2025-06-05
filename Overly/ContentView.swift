@@ -47,9 +47,8 @@ struct ContentView: View {
                 CommandPalette(isVisible: $showCommandPalette, onNavigate: navigateWebView)
             }
             .onKeyPress(.init("/")) {
-                // Ensure window is focused and brought to front using WindowManager
-                windowManager.focusCustomWindow()
-                showCommandPalette = true
+                // Use the shared method to show command palette
+                showCommandPaletteView()
                 return .handled
             }
         } else {
@@ -62,6 +61,9 @@ struct ContentView: View {
             window.reloadAction = { self.reloadWebView() }
             window.nextServiceAction = { self.selectNextService() }
         }
+        
+        // Set the command palette action in WindowManager
+        windowManager.showCommandPaletteAction = { self.showCommandPaletteView() }
     }
     
     private func initializeSelectedProvider() {
@@ -104,6 +106,12 @@ struct ContentView: View {
             let request = URLRequest(url: url)
             webView.load(request)
         }
+    }
+    
+    // Shared method to show command palette
+    private func showCommandPaletteView() {
+        windowManager.focusCustomWindow()
+        showCommandPalette = true
     }
 }
 
