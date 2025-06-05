@@ -27,15 +27,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let settings = AppSettings.shared
         UserDefaults.standard.synchronize() // Force synchronization
         
-        // Add a small delay to ensure settings are fully processed
+        // Check the showInDock setting directly from UserDefaults for immediate access
+        let showInDock = UserDefaults.standard.object(forKey: "showInDock") as? Bool ?? true
+        
+        // Set the activation policy immediately based on the setting
+        if showInDock {
+            NSApp.setActivationPolicy(.regular) // Show in Dock
+            print("AppDelegate: Setting activation policy to .regular (show in dock)")
+        } else {
+            NSApp.setActivationPolicy(.accessory) // Hide from Dock
+            print("AppDelegate: Setting activation policy to .accessory (hide from dock)")
+        }
+        
+        // Add a small delay to ensure settings are fully processed before other setup
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            // Read the initial showInDock setting and set the activation policy
-            if settings.showInDock {
-                NSApp.setActivationPolicy(.regular) // Show in Dock
+            if showInDock {
                 // Show the window immediately on launch if showing in dock
                 windowManager.toggleCustomWindowVisibility()
             } else {
-                NSApp.setActivationPolicy(.accessory) // Hide from Dock
                 // When hiding the dock icon on launch, explicitly activate the application
                 // so the menu bar icon is immediately available and the app is responsive.
                 NSApp.activate(ignoringOtherApps: true)

@@ -362,19 +362,4 @@ struct WebViewAccessor: NSViewRepresentable {
              self.webView(webView)
          }
     }
-}
-
-// Helper extension to find a subview of a specific type
-extension NSView {
-    func findSubview<T: NSView>(ofType type: T.Type) -> T? {
-        for subview in subviews {
-            if let targetView = subview as? T {
-                return targetView
-            }
-            if let targetView = subview.findSubview(ofType: type) {
-                return targetView
-            }
-        }
-        return nil
-    }
 } 
