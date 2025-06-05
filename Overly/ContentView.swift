@@ -15,29 +15,40 @@ struct ContentView: View {
     @State private var selectedProvider: ChatProvider?
     @State private var isLoading: Bool = false
     @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
+    @State private var showCommandPalette: Bool = false
 
     var body: some View {
         if hasCompletedOnboarding {
-            VStack(spacing: 0) {
-                CustomTitleBar(
-                    window: window,
-                    selectedProvider: $selectedProvider,
-                    settings: settings,
-                    windowManager: windowManager
-                )
-                
-                ProgressBarView(isLoading: $isLoading)
-                
-                if let provider = selectedProvider, let url = provider.url {
-                    WebView(url: url, isLoading: $isLoading)
-                } else {
-                    Color.clear
+            ZStack {
+                // Main content
+                VStack(spacing: 0) {
+                    CustomTitleBar(
+                        window: window,
+                        selectedProvider: $selectedProvider,
+                        settings: settings,
+                        windowManager: windowManager
+                    )
+                    
+                    ProgressBarView(isLoading: $isLoading)
+                    
+                    if let provider = selectedProvider, let url = provider.url {
+                        WebView(url: url, isLoading: $isLoading)
+                    } else {
+                        Color.clear
+                    }
                 }
+                .onAppear {
+                    setupWindow()
+                    initializeSelectedProvider()
+                    fetchFaviconsForActiveProviders()
+                }
+                
+                // Command palette overlay
+                CommandPalette(isVisible: $showCommandPalette, onNavigate: navigateWebView)
             }
-            .onAppear {
-                setupWindow()
-                initializeSelectedProvider()
-                fetchFaviconsForActiveProviders()
+            .onKeyPress(.init("/")) {
+                showCommandPalette = true
+                return .handled
             }
         } else {
             OnboardingView()
@@ -82,6 +93,14 @@ struct ContentView: View {
     internal func reloadWebView() {
         if let webView = window?.contentView?.findSubview(ofType: WKWebView.self) {
             webView.reload()
+        }
+    }
+    
+    // Navigation handler for command palette
+    private func navigateWebView(to url: URL) {
+        if let webView = window?.contentView?.findSubview(ofType: WKWebView.self) {
+            let request = URLRequest(url: url)
+            webView.load(request)
         }
     }
 }
