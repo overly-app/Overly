@@ -27,18 +27,36 @@ struct OverlyApp: App {
 
         // Define the menu bar extra
         MenuBarExtra {
-            // Content remains the same
+            Button("Toggle Window") {
+                WindowManager.shared.toggleCustomWindowVisibility()
+            }
+            
+            Divider()
+            
+            SettingsLink {
+                HStack {
+                    Text("Settings")
+                }
+            }
+            
+            Button("Check for Updates") {
+                // TODO: Implement update checking functionality
+                if let url = URL(string: "https://github.com/overly-app/Overly") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            
             Divider() // Add a separator line
+            
             Button("Quit") {
                 NSApplication.shared.terminate(nil) // Add a Quit button
             }
+            .keyboardShortcut("q", modifiers: .command)
         } label: {
-            // Custom label view for more control
-            HStack {
-                Image(systemName: "globe") // System image
-                Text("Overly") // The text label
-            }
-            // .background(.ultrathinMaterial) // Apply ultrathin material background
+            // Custom label view - menu bar icon that will render in white
+            Image("MenuBarIcon")
+                .renderingMode(.template)
+                .frame(width: 18, height: 18)
         }
         .settings(design: .sidebar) {
             SettingsTab(.new(title: "General", image: .init(systemName: "gearshape")), id: "general", color: .gray) {
