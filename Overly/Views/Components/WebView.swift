@@ -162,18 +162,15 @@ struct WebView: NSViewRepresentable {
             print("WebView: Navigation action for URL: \(url.absoluteString)")
 
             // Check if the URL is a redirect back to the main application's expected URL
-            // You might need to adjust this URL comparison based on the actual redirect URL from Google/Claude
             if url.absoluteString.starts(with: parent.url.absoluteString) {
-                 print("Allowing navigation back to main application URL in popup: \(url.absoluteString)")
+                 print("Allowing navigation back to main application URL: \(url.absoluteString)")
                  decisionHandler(.allow)
             } else if navigationAction.navigationType == .linkActivated && navigationAction.targetFrame == nil {
                  // Existing logic: Open external links in the default browser
                  NSWorkspace.shared.open(url)
-                 // Optionally hide the application window if needed, but maybe not for a popup redirect
-                 // NSApplication.shared.mainWindow?.orderOut(nil)
                  decisionHandler(.cancel)
             } else {
-                 // Allow other types of navigation within the WebView (including the initial Google login page load)
+                 // Allow other types of navigation within the WebView
                  decisionHandler(.allow)
             }
         }
@@ -211,63 +208,31 @@ struct WebView: NSViewRepresentable {
             
             // Create a new window for the popup
             let newWindow = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 600, height: 800), // Adjust size as needed
-                styleMask: [.titled, .closable, .resizable], // Provide standard window controls
+                contentRect: NSRect(x: 0, y: 0, width: 600, height: 800),
+                styleMask: [.titled, .closable, .resizable],
                 backing: .buffered,
                 defer: true
             )
-            newWindow.center() // Center the new window
-            newWindow.level = .modalPanel // Set the window level to appear above floating windows
+            newWindow.center()
+            newWindow.level = .modalPanel
+            newWindow.title = "Login"
             
-            // Create a vertical stack view to hold the web view and the button
-            let stackView = NSStackView()
-            stackView.orientation = .vertical
-            stackView.distribution = .fill
-            stackView.spacing = 10 // Add some spacing between items
+            // Set the popup web view directly as the content view
+            newWindow.contentView = popupWebView
             
-            // Add the popup web view to the stack view
-            stackView.addArrangedSubview(popupWebView)
-            
-            // Create and configure the close app button
-            let closeButton = NSButton(title: "Showing One Moment Please, close app and relaunch (this is a known issue with claude login)", target: self, action: #selector(closeApp))
-            stackView.addArrangedSubview(closeButton)
-            
-            // Set the stack view as the content view of the new window
-            newWindow.contentView = stackView
-            
-            // Set constraints for the web view to fill the available space
-            popupWebView.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                popupWebView.leadingAnchor.constraint(equalTo: stackView.leadingAnchor),
-                popupWebView.trailingAnchor.constraint(equalTo: stackView.trailingAnchor),
-                // The top and bottom constraints will be managed by the stack view's distribution
-            ])
-            
-            // Set constraints for the button (optional, stack view handles basic layout)
-            closeButton.translatesAutoresizingMaskIntoConstraints = false
-            NSLayoutConstraint.activate([
-                closeButton.centerXAnchor.constraint(equalTo: stackView.centerXAnchor)
-            ])
-
             // Set the delegate for the popup web view
             popupWebView.navigationDelegate = self
-            popupWebView.uiDelegate = self // Ensure the new web view also has the UI delegate set
+            popupWebView.uiDelegate = self
 
-            newWindow.makeKeyAndOrderFront(nil) // Show the new window
+            newWindow.makeKeyAndOrderFront(nil)
 
             // Assign the new window to the popupWindow property and set its delegate
             self.popupWindow = newWindow
             newWindow.delegate = self
 
-            print("Created new web view for popup and showing in a new window with close button")
+            print("Created new web view for popup")
 
             return popupWebView
-        }
-
-        // Selector to terminate the application
-        @objc func closeApp() {
-            print("Close app button clicked. Terminating application.")
-            NSApplication.shared.terminate(nil)
         }
 
         // MARK: - WKNavigationDelegate Methods
@@ -320,23 +285,34 @@ struct WebView: NSViewRepresentable {
 
         // MARK: - NSWindowDelegate Methods
         
+        func windowShouldClose(_ sender: NSWindow) -> Bool {
+            // Allow the window to close
+            return true
+        }
+        
         func windowWillClose(_ notification: Notification) {
-            // Clean up the popup window and web view when the window is closed
+            // Prepare for cleanup but don't clear references yet
             if let closedWindow = notification.object as? NSWindow, closedWindow == self.popupWindow {
-                print("Popup window will close. Performing cleanup.")
+                print("Popup window will close. Preparing cleanup.")
                 
-                // Explicitly invalidate the web view's configuration
+                // Stop loading and clear delegates before window closes
                 if let popupWebView = closedWindow.contentView as? WKWebView {
-                     // Stop any loading content
                     popupWebView.stopLoading()
-                    // Explicitly nil out delegates to break potential cycles
                     popupWebView.navigationDelegate = nil
                     popupWebView.uiDelegate = nil
                 }
-
-                self.popupWindow?.contentView = nil // Release the web view from the window
-                self.popupWindow = nil // Release the window reference
-                // Any other necessary cleanup can go here
+            }
+        }
+        
+        func windowDidClose(_ notification: Notification) {
+            // Final cleanup after window has closed
+            if let closedWindow = notification.object as? NSWindow, closedWindow == self.popupWindow {
+                print("Popup window did close. Performing final cleanup.")
+                
+                // Now safely clear the reference
+                self.popupWindow = nil
+                
+                print("Popup window cleanup completed safely")
             }
         }
     }
