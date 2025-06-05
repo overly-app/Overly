@@ -244,9 +244,28 @@ class WindowManager: NSObject, ObservableObject {
         // Always ensure the window is visible and focused
         if let window = customWindow {
             print("Making window visible and focused")
-            window.setIsVisible(true)
-            NSApp.activate(ignoringOtherApps: true)
-            window.makeKeyAndOrderFront(nil)
+            
+            // Special handling for dock-less apps
+            if NSApp.activationPolicy() == .accessory {
+                print("App is dock-less, using special activation")
+                // For dock-less apps, we need to temporarily change activation policy
+                NSApp.setActivationPolicy(.regular)
+                window.setIsVisible(true)
+                NSApp.activate(ignoringOtherApps: true)
+                window.makeKeyAndOrderFront(nil)
+                window.orderFrontRegardless()
+                
+                // Change back to accessory after a short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    NSApp.setActivationPolicy(.accessory)
+                }
+            } else {
+                print("App is in dock, using normal activation")
+                window.setIsVisible(true)
+                NSApp.activate(ignoringOtherApps: true)
+                window.makeKeyAndOrderFront(nil)
+            }
+            
             enableContextHotkeys()
         }
     }
@@ -263,8 +282,26 @@ class WindowManager: NSObject, ObservableObject {
     // Method to ensure the custom window is focused and brought to front
     func focusCustomWindow() {
         if let window = customWindow, window.isVisible {
-            NSApp.activate(ignoringOtherApps: true)
-            window.makeKeyAndOrderFront(nil)
+            print("Focusing custom window")
+            
+            // Special handling for dock-less apps
+            if NSApp.activationPolicy() == .accessory {
+                print("App is dock-less, using special focus")
+                // For dock-less apps, temporarily change activation policy
+                NSApp.setActivationPolicy(.regular)
+                NSApp.activate(ignoringOtherApps: true)
+                window.makeKeyAndOrderFront(nil)
+                window.orderFrontRegardless()
+                
+                // Change back to accessory after a short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    NSApp.setActivationPolicy(.accessory)
+                }
+            } else {
+                print("App is in dock, using normal focus")
+                NSApp.activate(ignoringOtherApps: true)
+                window.makeKeyAndOrderFront(nil)
+            }
         }
     }
 
@@ -330,6 +367,24 @@ class WindowManager: NSObject, ObservableObject {
         // First dismiss the command palette window
         commandPaletteWindow?.orderOut(nil)
         
+        // Check if we need to handle dock-less mode before any window operations
+        let isDockless = NSApp.activationPolicy() == .accessory
+        if isDockless {
+            print("App is dock-less, switching to regular policy first")
+            NSApp.setActivationPolicy(.regular)
+            
+            // Give macOS time to process the activation policy change
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.performWindowOperations(url: url, isDockless: true)
+            }
+        } else {
+            // If not dock-less, proceed immediately
+            performWindowOperations(url: url, isDockless: false)
+        }
+    }
+    
+    @MainActor
+    private func performWindowOperations(url: URL, isDockless: Bool) {
         // Ensure the main window is visible - always show it, don't toggle
         if customWindow == nil {
             print("CustomWindow is nil, creating new window")
@@ -342,19 +397,33 @@ class WindowManager: NSObject, ObservableObject {
                     NSApp.activate(ignoringOtherApps: true)
                     window.makeKeyAndOrderFront(nil)
                     window.setIsVisible(true)
+                    window.orderFrontRegardless()
                 }
             }
         } else if !customWindow!.isVisible {
             print("CustomWindow exists but is hidden, showing it")
             // Show the window if it exists but is hidden
-            customWindow!.setIsVisible(true)
+            let window = customWindow!
             NSApp.activate(ignoringOtherApps: true)
-            customWindow!.makeKeyAndOrderFront(nil)
+            window.setIsVisible(true)
+            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
             enableContextHotkeys()
         } else {
             print("CustomWindow is already visible, focusing it")
             // Window is already visible, just make sure it's focused
-            focusCustomWindow()
+            let window = customWindow!
+            NSApp.activate(ignoringOtherApps: true)
+            window.makeKeyAndOrderFront(nil)
+            window.orderFrontRegardless()
+        }
+        
+        // Revert to accessory policy if we were dock-less
+        if isDockless {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                print("Reverting to accessory policy")
+                NSApp.setActivationPolicy(.accessory)
+            }
         }
         
         // Navigate in the WebView after a longer delay to ensure window is ready
