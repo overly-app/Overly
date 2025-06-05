@@ -19,6 +19,10 @@ struct ProviderChipViewSettings: View {
     var isSelected: Bool {
         settings.activeProviderIds.contains(provider.id)
     }
+    
+    var isDefaultProvider: Bool {
+        settings.defaultProviderId == provider.id
+    }
 
     var body: some View {
         Button(action: {
@@ -61,6 +65,13 @@ struct ProviderChipViewSettings: View {
                         }
                 }
                 
+                // Default provider indicator
+                if isDefaultProvider {
+                    Image(systemName: "star.fill")
+                        .foregroundColor(.yellow)
+                        .font(.system(size: 12))
+                }
+                
                 // Delete button for custom providers
                 if settings.customProviders.contains(where: { $0.id == provider.id }) {
                     Button(action: {
@@ -93,6 +104,17 @@ struct ProviderChipViewSettings: View {
                 Button("Rename") {
                     isRenaming = true
                     newProviderName = provider.name
+                }
+            }
+            if isSelected && provider.url != nil {
+                if isDefaultProvider {
+                    Button("Remove as Default") {
+                        settings.setDefaultProvider(nil)
+                    }
+                } else {
+                    Button("Set as Default") {
+                        settings.setDefaultProvider(provider)
+                    }
                 }
             }
         }
@@ -189,6 +211,38 @@ struct ProviderSettingsView: View {
 
      var body: some View {
          Form {
+             Section(header: Text("Default Provider")) {
+                 VStack(alignment: .leading, spacing: 8) {
+                     HStack {
+                         Image(systemName: "star.fill")
+                             .foregroundColor(.yellow)
+                             .font(.system(size: 16))
+                         
+                         if let defaultProvider = settings.defaultProvider {
+                             Text("**\(defaultProvider.name)** will load when the app starts")
+                                 .font(.system(size: 14))
+                         } else {
+                             Text("No default provider set - first active provider will load")
+                                 .font(.system(size: 14))
+                                 .foregroundColor(.secondary)
+                         }
+                     }
+                     
+                     Text("Right-click on any active provider below to set it as default, or look for the ⭐ star indicator.")
+                         .font(.system(size: 12))
+                         .foregroundColor(.secondary)
+                 }
+                 .padding(.horizontal, 16)
+                 .padding(.vertical, 12)
+                 .background(Color(NSColor.controlBackgroundColor))
+                 .cornerRadius(8)
+                 .overlay(
+                     RoundedRectangle(cornerRadius: 8)
+                         .stroke(Color(NSColor.separatorColor), lineWidth: 1)
+                 )
+             }
+             .frame(maxWidth: .infinity)
+             
              Section(header: Text("Built-in Providers")) {
                  FlowLayoutSettings(spacing: 8) {
                      ForEach(settings.allBuiltInProviders.filter { $0.url != nil }) { provider in
@@ -287,10 +341,7 @@ struct ProviderSettingsView: View {
      }
 
      func deleteCustomProvider(id: String) {
-         settings.customProviders.removeAll(where: { $0.id == id })
-         settings.activeProviderIds.remove(id)
-         settings.faviconCache.removeValue(forKey: id)
-         settings.saveSettings()
+         settings.removeCustomProvider(id: id)
      }
 }
 

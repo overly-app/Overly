@@ -39,6 +39,7 @@ class AppSettings: ObservableObject, @unchecked Sendable {
     private let toggleHotkeyModifiersKey = "toggleHotkeyModifiers"
     private let showInDockKey = "showInDock"
     private let windowFrameKey = "windowFrame"
+    private let defaultProviderIdKey = "defaultProviderId"
 
     @Published var customProviders: [ChatProvider] = []
     @Published var activeProviderIds: Set<String> = Set()
@@ -47,6 +48,7 @@ class AppSettings: ObservableObject, @unchecked Sendable {
     @Published var toggleHotkeyKey: Key = .j
     @Published var toggleHotkeyModifiers: NSEvent.ModifierFlags = [.command]
     @Published var windowFrame: NSRect = NSRect(x: 0, y: 0, width: 500, height: 600)
+    @Published var defaultProviderId: String?
     
     // Computed property to get all providers (built-in + custom)
     var allBuiltInProviders: [ChatProvider] {
@@ -56,6 +58,22 @@ class AppSettings: ObservableObject, @unchecked Sendable {
     var activeProviders: [ChatProvider] {
         // Combine built-in and custom providers and filter by activeProviderIds
         (allBuiltInProviders + customProviders).filter { activeProviderIds.contains($0.id) }
+    }
+    
+    // Computed property to get the default provider
+    var defaultProvider: ChatProvider? {
+        if let defaultProviderId = defaultProviderId {
+            return activeProviders.first { $0.id == defaultProviderId }
+        }
+        return nil
+    }
+    
+    // Method to get the provider to use on startup (default or first active)
+    var startupProvider: ChatProvider? {
+        if let defaultProvider = defaultProvider {
+            return defaultProvider
+        }
+        return activeProviders.first { $0.url != nil }
     }
 
     private init() {
@@ -108,6 +126,9 @@ class AppSettings: ObservableObject, @unchecked Sendable {
         if let modifiersRawValue = userDefaults.object(forKey: toggleHotkeyModifiersKey) as? UInt {
             toggleHotkeyModifiers = NSEvent.ModifierFlags(rawValue: modifiersRawValue)
         }
+        
+        // Load default provider ID
+        defaultProviderId = userDefaults.string(forKey: defaultProviderIdKey)
     }
     
     func saveSettings() {
@@ -139,6 +160,13 @@ class AppSettings: ObservableObject, @unchecked Sendable {
         userDefaults.set(UInt16(toggleHotkeyKey.carbonKeyCode), forKey: toggleHotkeyKeyKey)
         userDefaults.set(toggleHotkeyModifiers.rawValue, forKey: toggleHotkeyModifiersKey)
         
+        // Save default provider ID
+        if let defaultProviderId = defaultProviderId {
+            userDefaults.set(defaultProviderId, forKey: defaultProviderIdKey)
+        } else {
+            userDefaults.removeObject(forKey: defaultProviderIdKey)
+        }
+        
         // Force synchronization to disk
         userDefaults.synchronize()
     }
@@ -165,6 +193,10 @@ class AppSettings: ObservableObject, @unchecked Sendable {
         customProviders.removeAll(where: { $0.id == id })
         activeProviderIds.remove(id)
         faviconCache.removeValue(forKey: id)
+        // If this was the default provider, clear the default
+        if defaultProviderId == id {
+            defaultProviderId = nil
+        }
         saveSettings()
     }
     
@@ -172,8 +204,22 @@ class AppSettings: ObservableObject, @unchecked Sendable {
     func toggleActiveProvider(id: String) {
         if activeProviderIds.contains(id) {
             activeProviderIds.remove(id)
+            // If this was the default provider, clear the default
+            if defaultProviderId == id {
+                defaultProviderId = nil
+            }
         } else {
             activeProviderIds.insert(id)
+        }
+        saveSettings()
+    }
+    
+    // Method to set the default provider
+    func setDefaultProvider(_ provider: ChatProvider?) {
+        if let provider = provider, activeProviderIds.contains(provider.id) {
+            defaultProviderId = provider.id
+        } else {
+            defaultProviderId = nil
         }
         saveSettings()
     }

@@ -73,9 +73,7 @@ struct ContentView: View {
     
     private func initializeSelectedProvider() {
         if selectedProvider == nil {
-            if let firstActiveWebProvider = settings.activeProviders.first(where: { $0.url != nil }) {
-                selectedProvider = firstActiveWebProvider
-            }
+            selectedProvider = settings.startupProvider
         }
     }
     
