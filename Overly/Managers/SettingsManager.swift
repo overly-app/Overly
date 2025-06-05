@@ -26,7 +26,7 @@ class SettingsManager: ObservableObject {
         
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 700, height: 500),
-            styleMask: [.titled, .closable, .resizable],
+            styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
