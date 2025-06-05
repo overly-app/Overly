@@ -19,10 +19,6 @@ struct ProviderChipViewSettings: View {
     var isSelected: Bool {
         settings.activeProviderIds.contains(provider.id)
     }
-    
-    var isDefaultProvider: Bool {
-        settings.defaultProviderId == provider.id
-    }
 
     var body: some View {
         Button(action: {
@@ -37,8 +33,7 @@ struct ProviderChipViewSettings: View {
                     .font(.system(size: 14))
                 
                 // Service icon
-                ServiceIconViewSettings(provider: provider, settings: settings)
-                    .frame(width: 16, height: 16)
+                ServiceIconViewSettings(provider: provider, settings: settings, size: 16)
                 
                 // Service name (editable for custom providers)
                 if isRenaming && settings.customProviders.contains(where: { $0.id == provider.id }) {
@@ -63,13 +58,6 @@ struct ProviderChipViewSettings: View {
                                 newProviderName = provider.name
                             }
                         }
-                }
-                
-                // Default provider indicator
-                if isDefaultProvider {
-                    Image(systemName: "star.fill")
-                        .foregroundColor(.yellow)
-                        .font(.system(size: 12))
                 }
                 
                 // Delete button for custom providers
@@ -106,17 +94,6 @@ struct ProviderChipViewSettings: View {
                     newProviderName = provider.name
                 }
             }
-            if isSelected && provider.url != nil {
-                if isDefaultProvider {
-                    Button("Remove as Default") {
-                        settings.setDefaultProvider(nil)
-                    }
-                } else {
-                    Button("Set as Default") {
-                        settings.setDefaultProvider(provider)
-                    }
-                }
-            }
         }
     }
 }
@@ -125,6 +102,13 @@ struct ProviderChipViewSettings: View {
 struct ServiceIconViewSettings: View {
     let provider: ChatProvider
     @ObservedObject var settings: AppSettings
+    let size: CGFloat
+    
+    init(provider: ChatProvider, settings: AppSettings, size: CGFloat = 16) {
+        self.provider = provider
+        self.settings = settings
+        self.size = size
+    }
     
     var body: some View {
         Group {
@@ -132,17 +116,17 @@ struct ServiceIconViewSettings: View {
                 favicon
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 20, height: 20)
+                    .frame(width: size, height: size)
             } else if provider.isSystemImage {
                  Image(systemName: provider.iconName)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 20, height: 20)
+                    .frame(width: size, height: size)
             } else {
                  Image(provider.iconName)
                      .resizable()
                      .aspectRatio(contentMode: .fit)
-                     .frame(width: 20, height: 20)
+                     .frame(width: size, height: size)
                      .onAppear {
                          if provider.url != nil && settings.faviconCache[provider.id] == nil && settings.customProviders.contains(where: { $0.id == provider.id }) {
                              Task {
@@ -210,30 +194,60 @@ struct ProviderSettingsView: View {
      @State private var newProviderURLString: String = ""
 
      var body: some View {
-         Form {
-             Section(header: Text("Default Provider")) {
-                 VStack(alignment: .leading, spacing: 8) {
+         VStack(alignment: .leading, spacing: 20) {
+             // Default Provider Section
+             VStack(alignment: .leading, spacing: 12) {
+                 Text("Default Provider")
+                     .font(.headline)
+                     .foregroundColor(.primary)
+                 
+                 VStack(alignment: .leading, spacing: 12) {
                      HStack {
                          Image(systemName: "star.fill")
                              .foregroundColor(.yellow)
                              .font(.system(size: 16))
                          
-                         if let defaultProvider = settings.defaultProvider {
-                             Text("**\(defaultProvider.name)** will load when the app starts")
-                                 .font(.system(size: 14))
-                         } else {
-                             Text("No default provider set - first active provider will load")
-                                 .font(.system(size: 14))
-                                 .foregroundColor(.secondary)
-                         }
+                         Text("Choose which provider loads when the app starts:")
+                             .font(.system(size: 14))
                      }
                      
-                     Text("Right-click on any active provider below to set it as default, or look for the ⭐ star indicator.")
-                         .font(.system(size: 12))
-                         .foregroundColor(.secondary)
+                     HStack {
+                         Text("Default Startup Service:")
+                             .font(.system(size: 14))
+                             .foregroundColor(.secondary)
+                         
+                         Picker("Default Provider", selection: Binding(
+                             get: { settings.defaultProviderId ?? "none" },
+                             set: { newValue in
+                                 if newValue == "none" {
+                                     settings.setDefaultProvider(nil)
+                                 } else {
+                                     if let provider = settings.activeProviders.first(where: { $0.id == newValue }) {
+                                         settings.setDefaultProvider(provider)
+                                     }
+                                 }
+                             }
+                         )) {
+                             Text("No Default (First Active)")
+                                 .tag("none")
+                             
+                             ForEach(settings.activeProviders.filter { $0.url != nil }) { provider in
+                                 HStack {
+                                     ServiceIconViewSettings(provider: provider, settings: settings, size: 12)
+                                     Text(provider.name)
+                                 }
+                                 .tag(provider.id)
+                             }
+                         }
+                         .pickerStyle(.menu)
+                         .frame(maxWidth: 200)
+                         
+                         Spacer()
+                     }
                  }
                  .padding(.horizontal, 16)
                  .padding(.vertical, 12)
+                 .frame(maxWidth: .infinity, alignment: .leading)
                  .background(Color(NSColor.controlBackgroundColor))
                  .cornerRadius(8)
                  .overlay(
@@ -241,9 +255,13 @@ struct ProviderSettingsView: View {
                          .stroke(Color(NSColor.separatorColor), lineWidth: 1)
                  )
              }
-             .frame(maxWidth: .infinity)
              
-             Section(header: Text("Built-in Providers")) {
+             // Built-in Providers Section
+             VStack(alignment: .leading, spacing: 12) {
+                 Text("Built-in Providers")
+                     .font(.headline)
+                     .foregroundColor(.primary)
+                 
                  FlowLayoutSettings(spacing: 8) {
                      ForEach(settings.allBuiltInProviders.filter { $0.url != nil }) { provider in
                          ProviderChipViewSettings(provider: provider, settings: settings, onDelete: deleteCustomProvider)
@@ -251,6 +269,7 @@ struct ProviderSettingsView: View {
                  }
                  .padding(.horizontal, 16)
                  .padding(.vertical, 12)
+                 .frame(maxWidth: .infinity, alignment: .leading)
                  .background(Color(NSColor.controlBackgroundColor))
                  .cornerRadius(8)
                  .overlay(
@@ -258,10 +277,14 @@ struct ProviderSettingsView: View {
                          .stroke(Color(NSColor.separatorColor), lineWidth: 1)
                  )
              }
-             .frame(maxWidth: .infinity)
 
+             // Custom Providers Section
              if !settings.customProviders.isEmpty {
-                 Section(header: Text("Custom Providers")) {
+                 VStack(alignment: .leading, spacing: 12) {
+                     Text("Custom Providers")
+                         .font(.headline)
+                         .foregroundColor(.primary)
+                     
                      FlowLayoutSettings(spacing: 8) {
                          ForEach(settings.customProviders) { provider in
                              ProviderChipViewSettings(provider: provider, settings: settings, onDelete: deleteCustomProvider)
@@ -269,6 +292,7 @@ struct ProviderSettingsView: View {
                      }
                      .padding(.horizontal, 16)
                      .padding(.vertical, 12)
+                     .frame(maxWidth: .infinity, alignment: .leading)
                      .background(Color(NSColor.controlBackgroundColor))
                      .cornerRadius(8)
                      .overlay(
@@ -276,10 +300,14 @@ struct ProviderSettingsView: View {
                              .stroke(Color(NSColor.separatorColor), lineWidth: 1)
                      )
                  }
-                 .frame(maxWidth: .infinity)
              }
 
-             Section(header: Text("Add Custom Provider")) {
+             // Add Custom Provider Section
+             VStack(alignment: .leading, spacing: 12) {
+                 Text("Add Custom Provider")
+                     .font(.headline)
+                     .foregroundColor(.primary)
+                     
                  VStack(spacing: 12) {
                      HStack(spacing: 8) {
                          TextField("Provider Name", text: $newProviderName)
@@ -299,6 +327,7 @@ struct ProviderSettingsView: View {
                      .padding(.horizontal, 8)
                      .padding(.vertical, 8)
                  }
+                 .frame(maxWidth: .infinity, alignment: .leading)
                  .background(Color(NSColor.controlBackgroundColor))
                  .cornerRadius(8)
                  .overlay(
@@ -306,9 +335,10 @@ struct ProviderSettingsView: View {
                          .stroke(Color(NSColor.separatorColor), lineWidth: 1)
                  )
              }
-             .frame(maxWidth: .infinity)
+             
+             Spacer()
          }
-         .padding()
+         .padding(20)
          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
      }
 
