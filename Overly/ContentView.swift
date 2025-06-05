@@ -29,12 +29,16 @@ struct ContentView: View {
                         windowManager: windowManager
                     )
                     
-                    ProgressBarView(isLoading: $isLoading)
-                    
-                    if let provider = selectedProvider, let url = provider.url {
-                        WebView(url: url, isLoading: $isLoading)
-                    } else {
-                        Color.clear
+                    // WebView with overlaid progress bar
+                    ZStack(alignment: .top) {
+                        if let provider = selectedProvider, let url = provider.url {
+                            WebView(url: url, isLoading: $isLoading)
+                        } else {
+                            Color.clear
+                        }
+                        
+                        // Progress bar overlaid at the top
+                        ProgressBarView(isLoading: $isLoading)
                     }
                 }
                 .onAppear {
