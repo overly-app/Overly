@@ -12,6 +12,9 @@ struct StandaloneCommandPalette: View {
     @State private var command: String = ""
     @FocusState private var isInputFocused: Bool
     @State private var selectedIndex: Int = 0
+    @State private var historyIndex: Int = -1 // -1 means not in history mode
+    @State private var isInHistoryMode: Bool = false
+    @StateObject private var commandHistory = CommandHistory.shared
     let onNavigate: (URL) -> Void
     @ObservedObject var settings = AppSettings.shared
     
@@ -61,6 +64,12 @@ struct StandaloneCommandPalette: View {
         return trimmedCommand.contains(" ") && !currentQuery.isEmpty
     }
     
+    // Check if we should show history or autocomplete
+    private var shouldShowHistory: Bool {
+        let trimmedCommand = command.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedCommand.isEmpty || trimmedCommand == "/"
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             HStack {
@@ -79,7 +88,15 @@ struct StandaloneCommandPalette: View {
                         if !newValue.isEmpty && !newValue.hasPrefix("/") {
                             command = "/" + newValue
                         }
-                        selectedIndex = 0
+                        // Reset selection when command changes (unless we're in history mode)
+                        if !isInHistoryMode {
+                            selectedIndex = 0
+                        }
+                        // Exit history mode when typing
+                        if !shouldShowHistory {
+                            isInHistoryMode = false
+                            historyIndex = -1
+                        }
                     }
             }
             .padding(.horizontal, 20)
@@ -87,8 +104,53 @@ struct StandaloneCommandPalette: View {
             .background(.regularMaterial)
             .cornerRadius(10)
             
-            // Command hints and autocomplete
-            if !filteredCommands.isEmpty {
+            // Command hints and autocomplete or history
+            if shouldShowHistory && !commandHistory.history.isEmpty {
+                // Show history
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Recent Commands")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
+                    
+                    ForEach(Array(commandHistory.history.enumerated()), id: \.element) { index, historyCommand in
+                        HStack {
+                            Text(historyCommand)
+                                .font(.system(size: 13, design: .monospaced))
+                                .foregroundColor(isInHistoryMode && index == historyIndex ? .white : .primary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(isInHistoryMode && index == historyIndex ? Color.accentColor : Color.clear)
+                                .cornerRadius(5)
+                            
+                            Spacer()
+                            
+                            if isInHistoryMode && index == historyIndex {
+                                Text("ENTER")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.secondary.opacity(0.2))
+                                    .cornerRadius(3)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 2)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            command = historyCommand
+                            executeCommand(historyCommand)
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
+                .background(.regularMaterial)
+                .cornerRadius(10)
+                .padding(.top, 3)
+            } else if !filteredCommands.isEmpty {
+                // Show autocomplete
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(Array(filteredCommands.enumerated()), id: \.element.command) { index, commandInfo in
                         CommandHint(
@@ -111,6 +173,8 @@ struct StandaloneCommandPalette: View {
         .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
         .onAppear {
             selectedIndex = 0
+            historyIndex = -1
+            isInHistoryMode = false
             command = "/"
             
             // Ensure focus with a small delay
@@ -152,18 +216,46 @@ struct StandaloneCommandPalette: View {
     }
     
     private func navigateUp() {
-        if !filteredCommands.isEmpty {
+        if shouldShowHistory && !commandHistory.history.isEmpty {
+            // Navigate through history
+            isInHistoryMode = true
+            if historyIndex == -1 {
+                historyIndex = 0
+            } else {
+                historyIndex = max(0, historyIndex - 1)
+            }
+        } else if !filteredCommands.isEmpty {
+            // Navigate through autocomplete
+            isInHistoryMode = false
             selectedIndex = max(0, selectedIndex - 1)
         }
     }
     
     private func navigateDown() {
-        if !filteredCommands.isEmpty {
+        if shouldShowHistory && !commandHistory.history.isEmpty {
+            // Navigate through history
+            isInHistoryMode = true
+            if historyIndex == -1 {
+                historyIndex = 0
+            } else {
+                historyIndex = min(commandHistory.history.count - 1, historyIndex + 1)
+            }
+        } else if !filteredCommands.isEmpty {
+            // Navigate through autocomplete
+            isInHistoryMode = false
             selectedIndex = min(filteredCommands.count - 1, selectedIndex + 1)
         }
     }
     
     private func handleTabCompletion() {
+        if shouldShowHistory && isInHistoryMode && historyIndex >= 0 && historyIndex < commandHistory.history.count {
+            // Select from history
+            command = commandHistory.history[historyIndex]
+            isInHistoryMode = false
+            historyIndex = -1
+            return
+        }
+        
         guard selectedIndex < filteredCommands.count else { return }
         let selectedCommand = filteredCommands[selectedIndex]
         
@@ -184,42 +276,59 @@ struct StandaloneCommandPalette: View {
     private func executeCommand(_ command: String) {
         let trimmedCommand = command.trimmingCharacters(in: .whitespacesAndNewlines)
         
+        // Handle history selection
+        if shouldShowHistory && isInHistoryMode && historyIndex >= 0 && historyIndex < commandHistory.history.count {
+            let selectedHistoryCommand = commandHistory.history[historyIndex]
+            commandHistory.addCommand(selectedHistoryCommand) // Move to front
+            executeCommandLogic(selectedHistoryCommand)
+            hideCommandPalette()
+            return
+        }
+        
+        // Add to history before executing
+        commandHistory.addCommand(trimmedCommand)
+        
+        executeCommandLogic(trimmedCommand)
+        hideCommandPalette()
+    }
+    
+    private func executeCommandLogic(_ command: String) {
         // Track if command was executed successfully
         var commandExecuted = false
         
-        if trimmedCommand.hasPrefix("/t3 ") {
-            let query = String(trimmedCommand.dropFirst(4))
+        if command.hasPrefix("/t3 ") {
+            let query = String(command.dropFirst(4))
             navigateToT3(with: query)
             commandExecuted = true
-        } else if trimmedCommand == "/t3" {
+        } else if command == "/t3" {
             navigateToT3(with: "")
             commandExecuted = true
-        } else if trimmedCommand.hasPrefix("/chat ") {
-            let query = String(trimmedCommand.dropFirst(6))
+        } else if command.hasPrefix("/chat ") {
+            let query = String(command.dropFirst(6))
             navigateToChatGPT(with: query)
             commandExecuted = true
-        } else if trimmedCommand == "/chat" {
+        } else if command == "/chat" {
             navigateToChatGPT(with: "")
             commandExecuted = true
-        } else if trimmedCommand.hasPrefix("/claude ") {
-            let query = String(trimmedCommand.dropFirst(8))
+        } else if command.hasPrefix("/claude ") {
+            let query = String(command.dropFirst(8))
             navigateToClaude(with: query)
             commandExecuted = true
-        } else if trimmedCommand == "/claude" {
+        } else if command == "/claude" {
             navigateToClaude(with: "")
             commandExecuted = true
-        } else if trimmedCommand.hasPrefix("/perplexity ") {
-            let query = String(trimmedCommand.dropFirst(12))
+        } else if command.hasPrefix("/perplexity ") {
+            let query = String(command.dropFirst(12))
             navigateToPerplexity(with: query)
             commandExecuted = true
-        } else if trimmedCommand == "/perplexity" {
+        } else if command == "/perplexity" {
             navigateToPerplexity(with: "")
             commandExecuted = true
-        } else if trimmedCommand.hasPrefix("/copilot ") {
-            let query = String(trimmedCommand.dropFirst(9))
+        } else if command.hasPrefix("/copilot ") {
+            let query = String(command.dropFirst(9))
             navigateToCopilot(with: query)
             commandExecuted = true
-        } else if trimmedCommand == "/copilot" {
+        } else if command == "/copilot" {
             navigateToCopilot(with: "")
             commandExecuted = true
         }
