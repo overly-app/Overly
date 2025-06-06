@@ -166,9 +166,27 @@ struct WebView: NSViewRepresentable {
                  print("Allowing navigation back to main application URL: \(url.absoluteString)")
                  decisionHandler(.allow)
             } else if navigationAction.navigationType == .linkActivated && navigationAction.targetFrame == nil {
-                 // Existing logic: Open external links in the default browser
-                 NSWorkspace.shared.open(url)
-                 decisionHandler(.cancel)
+                 // Check if this is an authentication flow that should stay within the app
+                 let authenticationDomains = [
+                     "accounts.google.com",
+                     "oauth2.googleapis.com", 
+                     "myaccount.google.com",
+                     "accounts.youtube.com",
+                     "gemini.google.com"
+                 ]
+                 
+                 let shouldStayInApp = authenticationDomains.contains { domain in
+                     url.host?.lowercased().contains(domain.lowercased()) == true
+                 }
+                 
+                 if shouldStayInApp {
+                     print("Allowing authentication flow within app for: \(url.absoluteString)")
+                     decisionHandler(.allow)
+                 } else {
+                     // Open external links in the default browser
+                     NSWorkspace.shared.open(url)
+                     decisionHandler(.cancel)
+                 }
             } else {
                  // Allow other types of navigation within the WebView
                  decisionHandler(.allow)
