@@ -50,9 +50,17 @@ struct ChatProviderSettingsView: View {
         .background(VisualEffectView(material: .sheet, blendingMode: .behindWindow))
         .onAppear {
             loadSettings()
+            // Fetch models for the current provider
+            Task {
+                await chatManager.fetchModelsForProvider(selectedProvider)
+            }
         }
         .onChange(of: selectedProvider) { _, _ in
             loadModelForProvider()
+            // Fetch models for the new provider
+            Task {
+                await chatManager.fetchModelsForProvider(selectedProvider)
+            }
         }
         .sheet(isPresented: $showingAPIKeySetup) {
             APIKeySetupView()
@@ -131,7 +139,7 @@ struct ChatProviderSettingsView: View {
                 Image(provider.iconName)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 14, height: 14)
+                    .frame(width: 12, height: 12)
             }
         }
         .foregroundColor(.primary)
@@ -153,7 +161,7 @@ struct ChatProviderSettingsView: View {
                         .fontWeight(.medium)
                     
                     Picker("Model", selection: $selectedModel) {
-                        ForEach(selectedProvider.supportedModels, id: \.self) { model in
+                        ForEach(chatManager.availableModels.isEmpty ? selectedProvider.supportedModels : chatManager.availableModels, id: \.self) { model in
                             Text(model)
                                 .tag(model)
                         }
