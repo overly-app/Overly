@@ -142,11 +142,11 @@ class ChatManager: ObservableObject {
     
     func fetchModelsForProvider(_ provider: ChatProviderType) async {
         do {
-            print("Fetching models for \(provider.rawValue)...")
+            print("🔄 Fetching models for \(provider.rawValue)...")
             let models = try await apiManager.fetchAvailableModels(for: provider)
             await MainActor.run {
                 self.availableModels = models
-                print("✅ Successfully loaded \(models.count) models for \(provider.rawValue)")
+                print("✅ Successfully loaded \(models.count) models for \(provider.rawValue): \(models)")
                 
                 // Update current session model if it's not in the available list
                 if let currentSession = self.currentSession,

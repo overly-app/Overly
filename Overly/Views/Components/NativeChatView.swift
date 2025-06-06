@@ -44,6 +44,11 @@ struct NativeChatView: View {
                 }
             }
         }
+        .onChange(of: chatManager.selectedProvider) { _, newProvider in
+            Task {
+                await chatManager.fetchModelsForProvider(newProvider)
+            }
+        }
     }
     
     // MARK: - Sidebar
@@ -231,6 +236,11 @@ struct NativeChatView: View {
             // Model selector
             if !chatManager.availableModels.isEmpty {
                 modelSelector
+            } else {
+                // Debug: Show if models are loading
+                Text("Loading models...")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
             }
             
             // Action buttons
@@ -266,9 +276,19 @@ struct NativeChatView: View {
     private var modelSelector: some View {
         Menu {
             ForEach(chatManager.availableModels, id: \.self) { model in
-                Button(model) {
+                Button(action: {
                     if let session = chatManager.currentSession {
                         session.model = model
+                        print("✅ Model changed to: \(model)")
+                    }
+                }) {
+                    HStack {
+                        Text(model)
+                        Spacer()
+                        if chatManager.currentSession?.model == model {
+                            Image(systemName: "checkmark")
+                                .foregroundColor(.accentColor)
+                        }
                     }
                 }
             }
@@ -276,19 +296,25 @@ struct NativeChatView: View {
             HStack(spacing: 4) {
                 Text(chatManager.currentSession?.model ?? chatManager.selectedProvider.defaultModel)
                     .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 10))
                     .foregroundColor(.secondary)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
             .background(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: 8)
                     .fill(Color(NSColor.controlBackgroundColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color(NSColor.separatorColor), lineWidth: 0.5)
+                    )
             )
         }
         .menuStyle(.borderlessButton)
+        .help("Select Model")
     }
     
 
