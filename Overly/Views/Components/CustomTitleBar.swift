@@ -29,29 +29,29 @@ struct CustomTitleBar: View {
             Spacer()
             
             // Native Chat Toggle
-            HStack(spacing: 8) {
-                Button(action: { useNativeChat = false }) {
-                    Image(systemName: "globe")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(useNativeChat ? .secondary : .white)
-                }
-                .buttonStyle(.plain)
-                .help("Web Mode")
+            // HStack(spacing: 8) {
+            //     Button(action: { useNativeChat = false }) {
+            //         Image(systemName: "globe")
+            //             .font(.system(size: 14, weight: .medium))
+            //             .foregroundColor(useNativeChat ? .secondary : .white)
+            //     }
+            //     .buttonStyle(.plain)
+            //     .help("Web Mode")
                 
-                Button(action: { useNativeChat = true }) {
-                    Image(systemName: "brain")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(useNativeChat ? .white : .secondary)
-                }
-                .buttonStyle(.plain)
-                .help("Native Chat")
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.black.opacity(0.2))
-            )
+            //     Button(action: { useNativeChat = true }) {
+            //         Image(systemName: "brain")
+            //             .font(.system(size: 14, weight: .medium))
+            //             .foregroundColor(useNativeChat ? .white : .secondary)
+            //     }
+            //     .buttonStyle(.plain)
+            //     .help("Native Chat")
+            // }
+            // .padding(.horizontal, 8)
+            // .padding(.vertical, 4)
+            // .background(
+            //     RoundedRectangle(cornerRadius: 6)
+            //         .fill(Color.black.opacity(0.2))
+            // )
             
             Spacer()
             
