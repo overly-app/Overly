@@ -73,20 +73,21 @@ enum ChatProviderType: String, CaseIterable, Identifiable {
     
     var defaultModel: String {
         switch self {
-        case .openai: return "gpt-4"
-        case .gemini: return "gemini-2.0-flash-exp"
+        case .openai: return "gpt-4o"
+        case .gemini: return "gemini-1.5-flash"
         case .groq: return "mixtral-8x7b-32768"
         }
     }
     
     var supportedModels: [String] {
+        // Minimal fallback models - only used if API fetch fails
         switch self {
         case .openai:
-            return ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"]
+            return ["gpt-4o", "gpt-4", "gpt-3.5-turbo"]
         case .gemini:
-            return ["gemini-2.0-flash-exp", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro", "gemini-pro-vision"]
+            return ["gemini-1.5-flash", "gemini-1.5-pro"]
         case .groq:
-            return ["mixtral-8x7b-32768", "llama2-70b-4096", "gemma-7b-it"]
+            return ["mixtral-8x7b-32768", "llama-3.1-8b-instant"]
         }
     }
 }
@@ -217,6 +218,28 @@ struct GeminiCandidate: Codable {
     }
 }
 
+// Gemini Streaming Response
+struct GeminiStreamResponse: Codable {
+    let candidates: [GeminiCandidate]
+}
+
+// OpenAI Models API Response
+struct OpenAIModelsResponse: Codable {
+    let data: [OpenAIModelInfo]
+}
+
+struct OpenAIModelInfo: Codable {
+    let id: String
+    let object: String
+    let created: Int?
+    let ownedBy: String?
+    
+    private enum CodingKeys: String, CodingKey {
+        case id, object, created
+        case ownedBy = "owned_by"
+    }
+}
+
 // Gemini Models API Response
 struct GeminiModelsResponse: Codable {
     let models: [GeminiModel]
@@ -224,14 +247,21 @@ struct GeminiModelsResponse: Codable {
 
 struct GeminiModel: Codable {
     let name: String
-    let displayName: String
-    let description: String
+    let displayName: String?
+    let description: String?
     let supportedGenerationMethods: [String]
+    let baseModelId: String?
+    let version: String?
+    let inputTokenLimit: Int?
+    let outputTokenLimit: Int?
     
     private enum CodingKeys: String, CodingKey {
-        case name, description
+        case name, description, version
         case displayName = "displayName"
         case supportedGenerationMethods = "supportedGenerationMethods"
+        case baseModelId = "baseModelId"
+        case inputTokenLimit = "inputTokenLimit"
+        case outputTokenLimit = "outputTokenLimit"
     }
 }
 

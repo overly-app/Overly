@@ -424,7 +424,7 @@ struct NativeChatView: View {
                 HStack(alignment: .bottom, spacing: 12) {
                     // Text input
                     ZStack(alignment: .topLeading) {
-                        RoundedRectangle(cornerRadius: 24)
+                        RoundedRectangle(cornerRadius: 16)
                             .fill(Color(NSColor.controlBackgroundColor))
                             .stroke(isInputFocused ? Color.accentColor : Color(NSColor.separatorColor), lineWidth: 1.5)
                         
@@ -446,10 +446,10 @@ struct NativeChatView: View {
                                 ZStack {
                                     Circle()
                                         .fill(canSendMessage ? Color.accentColor : Color(NSColor.controlBackgroundColor))
-                                        .frame(width: 32, height: 32)
+                                        .frame(width: 28, height: 28)
                                     
                                     Image(systemName: chatManager.isLoading ? "stop.fill" : "arrow.up")
-                                        .font(.system(size: 14, weight: .bold))
+                                        .font(.system(size: 12, weight: .bold))
                                         .foregroundColor(canSendMessage ? .white : .secondary)
                                 }
                             }
@@ -457,9 +457,9 @@ struct NativeChatView: View {
                             .disabled(!canSendMessage && !chatManager.isLoading)
                         }
                         .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
+                        .padding(.vertical, 8)
                     }
-                    .frame(minHeight: 48)
+                    .frame(minHeight: 32)
                 }
                 
                 // Footer text

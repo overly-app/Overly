@@ -131,6 +131,10 @@ class ChatManager: ObservableObject {
         // Update current session provider or create new session
         if let current = currentSession {
             current.provider = provider
+            // Update model to provider's default if current model isn't available
+            if !availableModels.contains(current.model) {
+                current.model = provider.defaultModel
+            }
         } else {
             createNewSession(provider: provider)
         }
@@ -138,14 +142,26 @@ class ChatManager: ObservableObject {
     
     func fetchModelsForProvider(_ provider: ChatProviderType) async {
         do {
+            print("Fetching models for \(provider.rawValue)...")
             let models = try await apiManager.fetchAvailableModels(for: provider)
             await MainActor.run {
                 self.availableModels = models
+                print("✅ Successfully loaded \(models.count) models for \(provider.rawValue)")
+                
+                // Update current session model if it's not in the available list
+                if let currentSession = self.currentSession,
+                   currentSession.provider == provider,
+                   !models.contains(currentSession.model) {
+                    print("⚠️ Current model '\(currentSession.model)' not available, switching to default")
+                    currentSession.model = provider.defaultModel
+                }
             }
         } catch {
-            print("Failed to fetch models for \(provider.rawValue): \(error)")
+            print("❌ Failed to fetch models for \(provider.rawValue): \(error)")
             await MainActor.run {
+                // Use fallback models
                 self.availableModels = provider.supportedModels
+                print("🔄 Using fallback models: \(provider.supportedModels)")
             }
         }
     }
@@ -229,6 +245,11 @@ class ChatManager: ObservableObject {
         let success = keychainManager.storeAPIKey(key, for: provider)
         if success {
             updateAvailableProviders()
+            
+            // Fetch models for the new provider
+            Task {
+                await fetchModelsForProvider(provider)
+            }
             
             // If this is the first API key, create a session
             if currentSession == nil {
