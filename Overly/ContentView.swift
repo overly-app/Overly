@@ -16,6 +16,7 @@ struct ContentView: View {
     @State private var isLoading: Bool = false
     @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
     @State private var showCommandPalette: Bool = false
+    @AppStorage("useNativeChat") var useNativeChat: Bool = false
 
     var body: some View {
         if hasCompletedOnboarding {
@@ -26,19 +27,25 @@ struct ContentView: View {
                         window: window,
                         selectedProvider: $selectedProvider,
                         settings: settings,
-                        windowManager: windowManager
+                        windowManager: windowManager,
+                        useNativeChat: $useNativeChat
                     )
                     
-                    // WebView with overlaid progress bar
-                    ZStack(alignment: .top) {
-                        if let provider = selectedProvider, let url = provider.url {
-                            WebView(url: url, isLoading: $isLoading)
-                        } else {
-                            Color.clear
+                    // Content area - either WebView or Native Chat
+                    if useNativeChat {
+                        NativeChatView()
+                    } else {
+                        // WebView with overlaid progress bar
+                        ZStack(alignment: .top) {
+                            if let provider = selectedProvider, let url = provider.url {
+                                WebView(url: url, isLoading: $isLoading)
+                            } else {
+                                Color.clear
+                            }
+                            
+                            // Progress bar overlaid at the top
+                            ProgressBarView(isLoading: $isLoading)
                         }
-                        
-                        // Progress bar overlaid at the top
-                        ProgressBarView(isLoading: $isLoading)
                     }
                 }
                 .onAppear {
@@ -47,8 +54,10 @@ struct ContentView: View {
                     fetchFaviconsForActiveProviders()
                 }
                 
-                // Command palette overlay
-                CommandPalette(isVisible: $showCommandPalette, onNavigate: navigateWebView)
+                // Command palette overlay (only for WebView mode)
+                if !useNativeChat {
+                    CommandPalette(isVisible: $showCommandPalette, onNavigate: navigateWebView)
+                }
             }
             // TEMPORARILY DISABLED: "/" key command palette in window context
             // Uncomment the block below to re-enable "/" command palette when window is focused

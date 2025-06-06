@@ -24,7 +24,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let windowManager = WindowManager.shared
 
         // Ensure AppSettings is fully loaded and UserDefaults is synchronized
-        let settings = AppSettings.shared
+        _ = AppSettings.shared
         UserDefaults.standard.synchronize() // Force synchronization
         
         // Check the showInDock setting directly from UserDefaults for immediate access
