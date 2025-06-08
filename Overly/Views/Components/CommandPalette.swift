@@ -150,11 +150,31 @@ struct CommandPalette: View {
     
     private func buildHistoryView() -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Recent Commands")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
+            HStack {
+                Text("Recent Commands")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                Button(action: {
+                    commandHistory.clearHistory()
+                }) {
+                    Text("Clear")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.secondary.opacity(0.1))
+                        .cornerRadius(3)
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    // Add subtle hover effect if needed
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
             
             ForEach(Array(commandHistory.history.enumerated()), id: \.element) { index, historyCommand in
                 HStack {
@@ -317,6 +337,13 @@ struct CommandPalette: View {
             commandHistory.addCommand(selectedHistoryCommand) // Move to front
             navigationHandler.executeCommand(selectedHistoryCommand)
             hideCommandPalette()
+            return
+        }
+        
+        // Handle clear command
+        if trimmedCommand.lowercased() == "/clear" {
+            commandHistory.clearHistory()
+            self.command = "/"
             return
         }
         

@@ -40,6 +40,11 @@ class CommandHistory: ObservableObject {
         saveHistory()
     }
     
+    func clearHistory() {
+        history.removeAll()
+        saveHistory()
+    }
+    
     private func loadHistory() {
         if let savedHistory = UserDefaults.standard.array(forKey: historyKey) as? [String] {
             history = savedHistory
