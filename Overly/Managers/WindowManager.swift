@@ -11,6 +11,8 @@ import Combine
 
 // Custom window class for command palette that ensures proper key handling
 class CommandPaletteWindow: NSWindow {
+    private var globalMouseMonitor: Any?
+    
     override var canBecomeKey: Bool {
         return true
     }
@@ -22,6 +24,47 @@ class CommandPaletteWindow: NSWindow {
     override func keyDown(with event: NSEvent) {
         // Let SwiftUI handle the key events first
         super.keyDown(with: event)
+    }
+    
+    override func makeKeyAndOrderFront(_ sender: Any?) {
+        super.makeKeyAndOrderFront(sender)
+        startMonitoringGlobalClicks()
+    }
+    
+    override func orderOut(_ sender: Any?) {
+        stopMonitoringGlobalClicks()
+        super.orderOut(sender)
+    }
+    
+    private func startMonitoringGlobalClicks() {
+        // Remove existing monitor if any
+        stopMonitoringGlobalClicks()
+        
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self = self else { return }
+            
+            // Get the click location in screen coordinates
+            let clickLocation = event.locationInWindow
+            let screenLocation = event.window?.convertToScreen(NSRect(origin: clickLocation, size: .zero)).origin ?? clickLocation
+            
+            // Check if the click is outside our window
+            if !self.frame.contains(screenLocation) {
+                DispatchQueue.main.async {
+                    self.orderOut(nil)
+                }
+            }
+        }
+    }
+    
+    private func stopMonitoringGlobalClicks() {
+        if let monitor = globalMouseMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalMouseMonitor = nil
+        }
+    }
+    
+    deinit {
+        stopMonitoringGlobalClicks()
     }
 }
 
