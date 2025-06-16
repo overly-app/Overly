@@ -12,10 +12,38 @@ class AIChatMessage: ObservableObject, Identifiable {
     @Published var content: String
     let isUser: Bool
     let timestamp: Date = Date()
+    @Published var responses: [String] = [] // For AI messages with multiple responses
+    @Published var currentResponseIndex: Int = 0
     
     init(content: String, isUser: Bool) {
         self.content = content
         self.isUser = isUser
+        if !isUser {
+            self.responses = [content]
+        }
+    }
+    
+    func addResponse(_ response: String) {
+        if !isUser {
+            responses.append(response)
+            currentResponseIndex = responses.count - 1
+            content = response
+        }
+    }
+    
+    func clearResponses() {
+        if !isUser {
+            responses.removeAll()
+            content = ""
+            currentResponseIndex = 0
+        }
+    }
+    
+    func setCurrentResponse(at index: Int) {
+        if !isUser && index >= 0 && index < responses.count {
+            currentResponseIndex = index
+            content = responses[index]
+        }
     }
 }
 
@@ -134,7 +162,17 @@ struct AIChatSidebar: View {
             ScrollView {
                 LazyVStack(spacing: 16) {
                     ForEach(messages) { message in
-                        MessageBubble(message: message)
+                        MessageBubble(message: message, onMessageEdited: {
+                            // Only trigger generation if it's a user message
+                            if message.isUser {
+                                generateResponseForEditedMessage()
+                            }
+                        }, onRegenerateResponse: { aiMessage in
+                            // Only regenerate if it's an AI message
+                            if !aiMessage.isUser {
+                                regenerateResponse(for: aiMessage)
+                            }
+                        })
                             .id(message.id)
                     }
                     
@@ -300,6 +338,12 @@ struct AIChatSidebar: View {
                     await MainActor.run {
                         // Update the content directly on the ObservableObject
                         aiMessage.content = fullResponse
+                        // Also update the responses array
+                        if aiMessage.responses.isEmpty {
+                            aiMessage.responses = [fullResponse]
+                        } else {
+                            aiMessage.responses[0] = fullResponse
+                        }
                     }
                 }
                 
@@ -338,6 +382,162 @@ struct AIChatSidebar: View {
             ]
         }
     }
+    
+    private func generateResponseForEditedMessage() {
+        // Check if Ollama model is selected
+        guard !ollamaManager.selectedModel.isEmpty else {
+            let errorMessage = AIChatMessage(content: "Please select an Ollama model first.", isUser: false)
+            messages.append(errorMessage)
+            return
+        }
+        
+        // Find and remove all AI responses after the last user message
+        if let lastUserIndex = messages.lastIndex(where: { $0.isUser }) {
+            // Remove all AI messages after the last user message
+            messages.removeSubrange((lastUserIndex + 1)...)
+        }
+        
+        // Show typing indicator and set generating state
+        isTyping = true
+        isGenerating = true
+        print("DEBUG: Set isGenerating = true (edited message)")
+        
+        currentTask = Task {
+            do {
+                // Prepare messages for Ollama using only user messages
+                var ollamaMessages: [OllamaChatMessage] = []
+                
+                // Add only user messages to the conversation
+                for msg in messages where msg.isUser {
+                    ollamaMessages.append(OllamaChatMessage(
+                        role: "user",
+                        content: msg.content
+                    ))
+                }
+                
+                // Send to Ollama and stream response
+                let stream = try await ollamaManager.sendChatMessage(messages: ollamaMessages)
+                
+                await MainActor.run {
+                    isTyping = false
+                    // Keep isGenerating = true during streaming
+                }
+                
+                // Create AI message and stream content
+                let aiMessage = AIChatMessage(content: "", isUser: false)
+                await MainActor.run {
+                    messages.append(aiMessage)
+                }
+                
+                var fullResponse = ""
+                for try await chunk in stream {
+                    // Check if task was cancelled
+                    if Task.isCancelled {
+                        break
+                    }
+                    
+                    print("Received chunk: '\(chunk)'") // Debug logging
+                    fullResponse += chunk
+                    await MainActor.run {
+                        // Update the content directly on the ObservableObject
+                        aiMessage.content = fullResponse
+                        // Also update the responses array
+                        if aiMessage.responses.isEmpty {
+                            aiMessage.responses = [fullResponse]
+                        } else {
+                            aiMessage.responses[0] = fullResponse
+                        }
+                    }
+                }
+                
+                // Reset generation state when complete
+                await MainActor.run {
+                    isGenerating = false
+                    print("DEBUG: Set isGenerating = false (edited message completed)")
+                }
+                
+            } catch {
+                await MainActor.run {
+                    isTyping = false
+                    isGenerating = false
+                    let errorMessage = AIChatMessage(content: "Error: \(error.localizedDescription)", isUser: false)
+                    messages.append(errorMessage)
+                }
+            }
+        }
+    }
+    
+    private func regenerateResponse(for message: AIChatMessage) {
+        // Check if Ollama model is selected
+        guard !ollamaManager.selectedModel.isEmpty else {
+            let errorMessage = AIChatMessage(content: "Please select an Ollama model first.", isUser: false)
+            messages.append(errorMessage)
+            return
+        }
+        
+        // Find the AI message in the messages array and get the conversation context
+        guard let aiMessageIndex = messages.firstIndex(where: { $0.id == message.id }) else { return }
+        
+        // Get all messages up to this AI message (excluding this AI message)
+        let contextMessages = Array(messages[..<aiMessageIndex])
+        
+        // Show typing indicator and set generating state
+        isTyping = true
+        isGenerating = true
+        print("DEBUG: Set isGenerating = true (regenerating)")
+        
+        currentTask = Task {
+            do {
+                // Prepare messages for Ollama using the conversation context
+                var ollamaMessages: [OllamaChatMessage] = []
+                
+                // Add conversation history up to the AI message being regenerated
+                for msg in contextMessages {
+                    ollamaMessages.append(OllamaChatMessage(
+                        role: msg.isUser ? "user" : "assistant",
+                        content: msg.content
+                    ))
+                }
+                
+                // Send to Ollama and stream response
+                let stream = try await ollamaManager.sendChatMessage(messages: ollamaMessages)
+                
+                await MainActor.run {
+                    isTyping = false
+                    // Keep isGenerating = true during streaming
+                }
+                
+                var fullResponse = ""
+                for try await chunk in stream {
+                    // Check if task was cancelled
+                    if Task.isCancelled {
+                        break
+                    }
+                    
+                    print("Received chunk: '\(chunk)'") // Debug logging
+                    fullResponse += chunk
+                    await MainActor.run {
+                        // Update the message content and add to responses
+                        message.addResponse(fullResponse)
+                    }
+                }
+                
+                // Reset generation state when complete
+                await MainActor.run {
+                    isGenerating = false
+                    print("DEBUG: Set isGenerating = false (regeneration completed)")
+                }
+                
+            } catch {
+                await MainActor.run {
+                    isTyping = false
+                    isGenerating = false
+                    let errorMessage = AIChatMessage(content: "Error: \(error.localizedDescription)", isUser: false)
+                    messages.append(errorMessage)
+                }
+            }
+        }
+    }
 }
 
 struct MessageBubble: View {
@@ -346,6 +546,14 @@ struct MessageBubble: View {
     @State private var isEditing = false
     @State private var editedContent = ""
     @State private var showCopyFeedback = false
+    let onMessageEdited: (() -> Void)?
+    let onRegenerateResponse: ((AIChatMessage) -> Void)?
+    
+    init(message: AIChatMessage, onMessageEdited: (() -> Void)? = nil, onRegenerateResponse: ((AIChatMessage) -> Void)? = nil) {
+        self.message = message
+        self.onMessageEdited = onMessageEdited
+        self.onRegenerateResponse = onRegenerateResponse
+    }
     
     var body: some View {
         HStack {
@@ -367,41 +575,74 @@ struct MessageBubble: View {
                 }
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    // Header with just AI label
+                    // Header with AI label only
                     HStack {
                         Text("AI:")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.gray)
                         
                         Spacer()
+                        
+                        // Pagination controls for multiple responses
+                        if message.responses.count > 1 {
+                            HStack(spacing: 4) {
+                                Button(action: {
+                                    let newIndex = max(0, message.currentResponseIndex - 1)
+                                    message.setCurrentResponse(at: newIndex)
+                                }) {
+                                    Image(systemName: "chevron.left")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(message.currentResponseIndex > 0 ? .gray : .gray.opacity(0.3))
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(message.currentResponseIndex <= 0)
+                                
+                                Text("\(message.currentResponseIndex + 1)/\(message.responses.count)")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.gray)
+                                
+                                Button(action: {
+                                    let newIndex = min(message.responses.count - 1, message.currentResponseIndex + 1)
+                                    message.setCurrentResponse(at: newIndex)
+                                }) {
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(message.currentResponseIndex < message.responses.count - 1 ? .gray : .gray.opacity(0.3))
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(message.currentResponseIndex >= message.responses.count - 1)
+                            }
+                        }
                     }
                     
                     // Message content
                     MarkdownRenderer(content: message.content, textColor: .white)
                         .textSelection(.enabled)
                     
-                    // Copy button below the response
-                    if isHovered {
-                        HStack {
-                            Spacer()
-                            Button(action: copyMessage) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: showCopyFeedback ? "checkmark" : "doc.on.doc")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(showCopyFeedback ? .green : .gray)
-                                    
-                                    Text(showCopyFeedback ? "Copied!" : "Copy")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(showCopyFeedback ? .green : .gray)
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.black.opacity(0.3))
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                            }
-                            .buttonStyle(.plain)
-                            .help("Copy response")
+                    // Copy button at the bottom - always visible
+                    HStack {
+                        // Regenerate button (only for AI messages)
+                        Button(action: {
+                            regenerateResponse(for: message)
+                        }) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 12))
+                                .foregroundColor(.gray)
+                                .frame(width: 20, height: 20)
                         }
+                        .buttonStyle(.plain)
+                        .help("Regenerate response")
+                        
+                        Spacer()
+                        
+                        Button(action: copyMessage) {
+                            Image(systemName: showCopyFeedback ? "checkmark" : "doc.on.doc")
+                                .font(.system(size: 12))
+                                .foregroundColor(showCopyFeedback ? .green : .gray)
+                                .frame(width: 20, height: 20)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Copy response")
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -498,6 +739,7 @@ struct MessageBubble: View {
                 Button("Save") {
                     message.content = editedContent
                     isEditing = false
+                    onMessageEdited?()
                 }
                 .foregroundColor(.white)
                 .font(.system(size: 12, weight: .medium))
@@ -560,6 +802,10 @@ struct MessageBubble: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             showCopyFeedback = false
         }
+    }
+    
+    private func regenerateResponse(for message: AIChatMessage) {
+        onRegenerateResponse?(message)
     }
 }
 
