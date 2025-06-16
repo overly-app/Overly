@@ -4,6 +4,10 @@ struct ChatMessageView: View {
     let message: ChatMessage
     @State private var isHovered = false
     @State private var streamingOpacity: Double = 1.0
+    @State private var isEditing = false
+    @State private var editedContent = ""
+    @State private var showCopyFeedback = false
+    @ObservedObject private var chatManager = ChatManager.shared
     
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -22,7 +26,9 @@ struct ChatMessageView: View {
                             .foregroundColor(.primary)
                         
                         // Message text
-                        if message.isStreaming && message.content.isEmpty {
+                        if isEditing && message.role == .user {
+                            editableMessageView
+                        } else if message.isStreaming && message.content.isEmpty {
                             typingIndicator
                         } else {
                             Text(message.content)
@@ -52,7 +58,7 @@ struct ChatMessageView: View {
                 .background(message.role == .user ? Color.clear : Color(NSColor.controlBackgroundColor).opacity(0.3))
                 
                 // Action buttons
-                if isHovered && !message.isStreaming {
+                if isHovered && !message.isStreaming && !isEditing {
                     actionButtons
                         .padding(.horizontal, 24)
                         .padding(.bottom, 8)
@@ -66,6 +72,9 @@ struct ChatMessageView: View {
         }
         .contextMenu {
             contextMenuItems
+        }
+        .onAppear {
+            editedContent = message.content
         }
     }
     
@@ -161,15 +170,60 @@ struct ChatMessageView: View {
         return 1.0 // Would be animated in real implementation
     }
     
+    private var editableMessageView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Text editor for editing
+            TextEditor(text: $editedContent)
+                .font(.system(size: 16))
+                .frame(minHeight: 80)
+                .scrollContentBackground(.hidden)
+                .background(Color(NSColor.controlBackgroundColor).opacity(0.3))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            // Edit action buttons
+            HStack(spacing: 8) {
+                Button("Cancel") {
+                    editedContent = message.content
+                    isEditing = false
+                }
+                .foregroundColor(.secondary)
+                .font(.system(size: 12))
+                
+                Button("Save & Regenerate") {
+                    saveEditedMessage()
+                }
+                .foregroundColor(.white)
+                .font(.system(size: 12, weight: .medium))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .background(Color.accentColor)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                
+                Spacer()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    
     private var actionButtons: some View {
         HStack(spacing: 8) {
             Button(action: copyMessage) {
-                Image(systemName: "doc.on.doc")
+                Image(systemName: showCopyFeedback ? "checkmark" : "doc.on.doc")
                     .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(showCopyFeedback ? .green : .secondary)
             }
             .buttonStyle(.plain)
             .help("Copy")
+            
+            if message.role == .user {
+                Button(action: { isEditing = true }) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Edit message")
+            }
             
             if message.role == .assistant {
                 Button(action: regenerateMessage) {
@@ -207,10 +261,51 @@ struct ChatMessageView: View {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(message.content, forType: .string)
+        
+        // Show feedback
+        showCopyFeedback = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            showCopyFeedback = false
+        }
+    }
+    
+    private func saveEditedMessage() {
+        guard !editedContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        
+        // Update the message content in the chat session
+        if let currentSession = chatManager.currentSession,
+           let messageIndex = currentSession.messages.firstIndex(where: { $0.id == message.id }) {
+            
+            var updatedMessage = message
+            updatedMessage.content = editedContent
+            currentSession.messages[messageIndex] = updatedMessage
+            
+            // Remove all messages after this one (to regenerate from this point)
+            let messagesToKeep = Array(currentSession.messages.prefix(messageIndex + 1))
+            currentSession.messages = messagesToKeep
+            
+            // Send the edited message to regenerate response
+            chatManager.sendMessage(editedContent)
+        }
+        
+        isEditing = false
     }
     
     private func regenerateMessage() {
-        // TODO: Implement regeneration
+        // Find the user message that prompted this response and resend it
+        if let currentSession = chatManager.currentSession,
+           let messageIndex = currentSession.messages.firstIndex(where: { $0.id == message.id }),
+           messageIndex > 0 {
+            
+            // Remove this response and any subsequent messages
+            let messagesToKeep = Array(currentSession.messages.prefix(messageIndex))
+            currentSession.messages = messagesToKeep
+            
+            // Find the last user message and resend it
+            if let lastUserMessage = messagesToKeep.last(where: { $0.role == .user }) {
+                chatManager.sendMessage(lastUserMessage.content)
+            }
+        }
     }
 }
 

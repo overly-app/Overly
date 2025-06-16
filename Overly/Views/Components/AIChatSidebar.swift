@@ -344,6 +344,10 @@ struct AIChatSidebar: View {
 
 struct MessageBubble: View {
     @ObservedObject var message: AIChatMessage
+    @State private var isHovered = false
+    @State private var isEditing = false
+    @State private var editedContent = ""
+    @State private var showCopyFeedback = false
     
     var body: some View {
         HStack {
@@ -351,61 +355,38 @@ struct MessageBubble: View {
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 6) {
-                    // Parse and display the message content
-                    if message.content.contains("**Selected text:**") {
-                        // This is a message with selected text
-                        let components = message.content.components(separatedBy: "\n\n**Question:** ")
-                        if components.count == 2 {
-                            let selectedTextPart = components[0].replacingOccurrences(of: "**Selected text:** \"", with: "").replacingOccurrences(of: "\"", with: "")
-                            let questionPart = components[1]
-                            
-                            // Selected text context (smaller, lighter)
-                            Text("📄 \(selectedTextPart)")
-                                .font(.system(size: 11))
-                                .foregroundColor(.white.opacity(0.8))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color.white.opacity(0.1))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .frame(maxWidth: 280, alignment: .trailing)
-                            
-                            // User's question (main message)
-                            VStack(alignment: .trailing) {
-                                MarkdownRenderer(content: questionPart, textColor: .white)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color(red: 0.0, green: 0.48, blue: 0.4))
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .frame(maxWidth: 280, alignment: .trailing)
-                        } else {
-                            // Fallback to regular display
-                            VStack(alignment: .trailing) {
-                                MarkdownRenderer(content: message.content, textColor: .white)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color(red: 0.0, green: 0.48, blue: 0.4))
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .frame(maxWidth: 280, alignment: .trailing)
-                        }
+                    // Message content (editable for user messages)
+                    if isEditing {
+                        editableMessageView
                     } else {
-                        // Regular message without selected text
-                        VStack(alignment: .trailing) {
-                            MarkdownRenderer(content: message.content, textColor: .white)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Color(red: 0.0, green: 0.48, blue: 0.4))
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .frame(maxWidth: 280, alignment: .trailing)
+                        messageContentView
+                    }
+                    
+                    // Action buttons on hover
+                    if isHovered && !isEditing {
+                        actionButtonsView
                     }
                 }
             } else {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("AI:")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.gray)
+                    HStack {
+                        Text("AI:")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.gray)
+                        
+                        Spacer()
+                        
+                        // Copy button for AI messages
+                        if isHovered {
+                            Button(action: copyMessage) {
+                                Image(systemName: showCopyFeedback ? "checkmark" : "doc.on.doc")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(showCopyFeedback ? .green : .gray)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Copy response")
+                        }
+                    }
                     
                     MarkdownRenderer(content: message.content, textColor: .white)
                         .textSelection(.enabled)
@@ -414,6 +395,157 @@ struct MessageBubble: View {
                 
                 Spacer()
             }
+        }
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isHovered = hovering
+            }
+        }
+        .onAppear {
+            editedContent = message.content
+        }
+    }
+    
+    // MARK: - Message Content Views
+    
+    @ViewBuilder
+    private var messageContentView: some View {
+        // Parse and display the message content
+        if message.content.contains("**Selected text:**") {
+            // This is a message with selected text
+            let components = message.content.components(separatedBy: "\n\n**Question:** ")
+            if components.count == 2 {
+                let selectedTextPart = components[0].replacingOccurrences(of: "**Selected text:** \"", with: "").replacingOccurrences(of: "\"", with: "")
+                let questionPart = components[1]
+                
+                // Selected text context (smaller, lighter)
+                Text("📄 \(selectedTextPart)")
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.8))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .frame(maxWidth: 280, alignment: .trailing)
+                
+                // User's question (main message)
+                VStack(alignment: .trailing) {
+                    MarkdownRenderer(content: questionPart, textColor: .white)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(red: 0.0, green: 0.48, blue: 0.4))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .frame(maxWidth: 280, alignment: .trailing)
+            } else {
+                // Fallback to regular display
+                VStack(alignment: .trailing) {
+                    MarkdownRenderer(content: message.content, textColor: .white)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(red: 0.0, green: 0.48, blue: 0.4))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .frame(maxWidth: 280, alignment: .trailing)
+            }
+        } else {
+            // Regular message without selected text
+            VStack(alignment: .trailing) {
+                MarkdownRenderer(content: message.content, textColor: .white)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color(red: 0.0, green: 0.48, blue: 0.4))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .frame(maxWidth: 280, alignment: .trailing)
+        }
+    }
+    
+    private var editableMessageView: some View {
+        VStack(alignment: .trailing, spacing: 8) {
+            // Text editor for editing
+            TextEditor(text: $editedContent)
+                .font(.system(size: 14))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(red: 0.0, green: 0.48, blue: 0.4).opacity(0.8))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .frame(maxWidth: 280, minHeight: 60, alignment: .trailing)
+                .scrollContentBackground(.hidden)
+            
+            // Edit action buttons
+            HStack(spacing: 8) {
+                Button("Cancel") {
+                    editedContent = message.content
+                    isEditing = false
+                }
+                .foregroundColor(.secondary)
+                .font(.system(size: 12))
+                
+                Button("Save") {
+                    message.content = editedContent
+                    isEditing = false
+                }
+                .foregroundColor(.white)
+                .font(.system(size: 12, weight: .medium))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .background(Color.accentColor)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
+    
+    private var actionButtonsView: some View {
+        HStack(spacing: 8) {
+            // Copy button
+            Button(action: copyMessage) {
+                Image(systemName: showCopyFeedback ? "checkmark" : "doc.on.doc")
+                    .font(.system(size: 12))
+                    .foregroundColor(showCopyFeedback ? .green : .gray)
+            }
+            .buttonStyle(.plain)
+            .help("Copy message")
+            
+            // Edit button (only for user messages)
+            if message.isUser {
+                Button(action: { isEditing = true }) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 12))
+                        .foregroundColor(.gray)
+                }
+                .buttonStyle(.plain)
+                .help("Edit message")
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.black.opacity(0.6))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+    
+    // MARK: - Actions
+    
+    private func copyMessage() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        
+        // For user messages with selected text, copy just the question part
+        if message.isUser && message.content.contains("**Selected text:**") {
+            let components = message.content.components(separatedBy: "\n\n**Question:** ")
+            if components.count == 2 {
+                pasteboard.setString(components[1], forType: .string)
+            } else {
+                pasteboard.setString(message.content, forType: .string)
+            }
+        } else {
+            pasteboard.setString(message.content, forType: .string)
+        }
+        
+        // Show feedback
+        showCopyFeedback = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            showCopyFeedback = false
         }
     }
 }
