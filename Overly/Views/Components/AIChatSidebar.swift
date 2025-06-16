@@ -127,7 +127,7 @@ struct AIChatSidebar: View {
     @State private var currentTask: Task<Void, Never>?
     @FocusState private var isInputFocused: Bool
     @StateObject private var textSelectionManager = TextSelectionManager.shared
-    @StateObject private var ollamaManager = OllamaManager.shared
+    @StateObject private var providerManager = AIProviderManager.shared
     @State private var showModelPicker = false
     @StateObject private var sidebarManager = AIChatSidebarManager.shared
     
@@ -244,7 +244,7 @@ struct AIChatSidebar: View {
                             .font(.system(size: 12))
                             .foregroundColor(.gray)
                         
-                        Text(ollamaManager.selectedModel.isEmpty ? "Select Model" : ollamaManager.selectedModel.replacingOccurrences(of: ":latest", with: ""))
+                        Text(providerManager.selectedModel.isEmpty ? "Select Model" : providerManager.selectedModel.replacingOccurrences(of: ":latest", with: ""))
                             .font(.system(size: 12))
                             .foregroundColor(.white)
                             .lineLimit(1)
@@ -265,7 +265,7 @@ struct AIChatSidebar: View {
                 
                 Spacer()
                 
-                if ollamaManager.isLoading {
+                if providerManager.isLoading {
                     ProgressView()
                         .scaleEffect(0.7)
                         .progressViewStyle(CircularProgressViewStyle(tint: .gray))
@@ -277,7 +277,7 @@ struct AIChatSidebar: View {
         .background(Color(red: 0.11, green: 0.11, blue: 0.11))
         .onAppear {
             Task {
-                await ollamaManager.fetchModels()
+                await providerManager.refreshAllModels()
             }
         }
     }
@@ -403,9 +403,9 @@ struct AIChatSidebar: View {
         // Clear the attachment after sending
         textSelectionManager.clearSelection()
         
-        // Check if Ollama model is selected
-        guard !ollamaManager.selectedModel.isEmpty else {
-            let errorMessage = AIChatMessage(content: "Please select an Ollama model first.", isUser: false)
+        // Check if model is selected
+        guard !providerManager.selectedModel.isEmpty else {
+            let errorMessage = AIChatMessage(content: "Please select a model first.", isUser: false)
             messages.append(errorMessage)
             return
         }
@@ -417,12 +417,12 @@ struct AIChatSidebar: View {
         
         currentTask = Task {
             do {
-                // Prepare messages for Ollama
-                var ollamaMessages: [OllamaChatMessage] = []
+                // Prepare messages for AI provider
+                var aiMessages: [AIProviderMessage] = []
                 
                 // Add context if there's selected text
                 if let context = selectedText {
-                    ollamaMessages.append(OllamaChatMessage(
+                    aiMessages.append(AIProviderMessage(
                         role: "system",
                         content: "The user has selected this text from a webpage: \"\(context)\". Please analyze this text and answer their question in relation to it. Reference specific parts of the selected text when relevant."
                     ))
@@ -432,7 +432,7 @@ struct AIChatSidebar: View {
                 let recentMessages = messages.suffix(6) // Last 6 messages for context
                 for msg in recentMessages {
                     if msg.id != userMessage.id { // Don't include the message we just added
-                        ollamaMessages.append(OllamaChatMessage(
+                        aiMessages.append(AIProviderMessage(
                             role: msg.isUser ? "user" : "assistant",
                             content: msg.content
                         ))
@@ -440,10 +440,10 @@ struct AIChatSidebar: View {
                 }
                 
                 // Add the current user message
-                ollamaMessages.append(OllamaChatMessage(role: "user", content: messageToSend))
+                aiMessages.append(AIProviderMessage(role: "user", content: messageToSend))
                 
-                // Send to Ollama and stream response
-                let stream = try await ollamaManager.sendChatMessage(messages: ollamaMessages)
+                // Send to AI provider and stream response
+                let stream = try await providerManager.sendMessage(aiMessages)
                 
                 await MainActor.run {
                     isTyping = false
@@ -562,9 +562,9 @@ struct AIChatSidebar: View {
     }
     
     private func generateResponseForEditedMessage() {
-        // Check if Ollama model is selected
-        guard !ollamaManager.selectedModel.isEmpty else {
-            let errorMessage = AIChatMessage(content: "Please select an Ollama model first.", isUser: false)
+        // Check if model is selected
+        guard !providerManager.selectedModel.isEmpty else {
+            let errorMessage = AIChatMessage(content: "Please select a model first.", isUser: false)
             messages.append(errorMessage)
             return
         }
@@ -582,19 +582,19 @@ struct AIChatSidebar: View {
         
         currentTask = Task {
             do {
-                // Prepare messages for Ollama using only user messages
-                var ollamaMessages: [OllamaChatMessage] = []
+                // Prepare messages for AI provider using only user messages
+                var aiMessages: [AIProviderMessage] = []
                 
                 // Add only user messages to the conversation
                 for msg in messages where msg.isUser {
-                    ollamaMessages.append(OllamaChatMessage(
+                    aiMessages.append(AIProviderMessage(
                         role: "user",
                         content: msg.content
                     ))
                 }
                 
-                // Send to Ollama and stream response
-                let stream = try await ollamaManager.sendChatMessage(messages: ollamaMessages)
+                // Send to AI provider and stream response
+                let stream = try await providerManager.sendMessage(aiMessages)
                 
                 await MainActor.run {
                     isTyping = false
@@ -652,9 +652,9 @@ struct AIChatSidebar: View {
     }
     
     private func regenerateResponse(for message: AIChatMessage) {
-        // Check if Ollama model is selected
-        guard !ollamaManager.selectedModel.isEmpty else {
-            let errorMessage = AIChatMessage(content: "Please select an Ollama model first.", isUser: false)
+        // Check if model is selected
+        guard !providerManager.selectedModel.isEmpty else {
+            let errorMessage = AIChatMessage(content: "Please select a model first.", isUser: false)
             messages.append(errorMessage)
             return
         }
@@ -673,19 +673,19 @@ struct AIChatSidebar: View {
         
         currentTask = Task {
             do {
-                // Prepare messages for Ollama using the conversation context
-                var ollamaMessages: [OllamaChatMessage] = []
+                // Prepare messages for AI provider using the conversation context
+                var aiMessages: [AIProviderMessage] = []
                 
                 // Add conversation history up to the AI message being regenerated
                 for msg in contextMessages {
-                    ollamaMessages.append(OllamaChatMessage(
+                    aiMessages.append(AIProviderMessage(
                         role: msg.isUser ? "user" : "assistant",
                         content: msg.content
                     ))
                 }
                 
-                // Send to Ollama and stream response
-                let stream = try await ollamaManager.sendChatMessage(messages: ollamaMessages)
+                // Send to AI provider and stream response
+                let stream = try await providerManager.sendMessage(aiMessages)
                 
                 await MainActor.run {
                     isTyping = false
@@ -790,7 +790,7 @@ struct AIChatSidebar: View {
             isGenerating: $isGenerating,
             currentTask: $currentTask,
             textSelectionManager: textSelectionManager,
-            ollamaManager: ollamaManager,
+            providerManager: providerManager,
             showModelPicker: $showModelPicker,
             onSwitchToSidebar: {
                 // Use DispatchQueue.main.async to safely update state
@@ -1248,13 +1248,14 @@ struct SelectedTextAttachmentView: View {
 }
 
 struct ModelPickerView: View {
-    @StateObject private var ollamaManager = OllamaManager.shared
+    @StateObject private var providerManager = AIProviderManager.shared
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedProvider: AIProvider?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Select Ollama Model")
+                Text("Select AI Model")
                     .font(.headline)
                     .foregroundColor(.primary)
                 
@@ -1262,13 +1263,36 @@ struct ModelPickerView: View {
                 
                 Button("Refresh") {
                     Task {
-                        await ollamaManager.fetchModels()
+                        await providerManager.refreshAllModels()
                     }
                 }
                 .font(.caption)
             }
             
-            if ollamaManager.isLoading {
+            // Provider selector
+            if providerManager.availableProviders.count > 1 {
+                HStack {
+                    Text("Provider:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Picker("Provider", selection: Binding(
+                        get: { selectedProvider ?? providerManager.selectedProvider },
+                        set: { newProvider in
+                            selectedProvider = newProvider
+                            providerManager.setSelectedProvider(newProvider)
+                        }
+                    )) {
+                        ForEach(providerManager.availableProviders) { provider in
+                            Text(provider.displayName).tag(provider)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .font(.caption)
+                }
+            }
+            
+            if providerManager.isLoading {
                 HStack {
                     ProgressView()
                         .scaleEffect(0.8)
@@ -1277,27 +1301,34 @@ struct ModelPickerView: View {
                         .foregroundColor(.secondary)
                 }
                 .padding(.vertical, 20)
-            } else if ollamaManager.availableModels.isEmpty {
+            } else if providerManager.currentProviderModels.isEmpty {
                 VStack(spacing: 8) {
                     Text("No models found")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
-                    Text("Make sure Ollama is running and has models installed")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
+                    if providerManager.selectedProvider == .ollama {
+                        Text("Make sure Ollama is running and has models installed")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    } else {
+                        Text("Check your API key and try refreshing")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
                 }
                 .padding(.vertical, 20)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 4) {
-                        ForEach(ollamaManager.availableModels) { model in
-                            ModelRow(
+                        ForEach(providerManager.currentProviderModels) { model in
+                            AIModelRow(
                                 model: model,
-                                isSelected: model.name == ollamaManager.selectedModel
+                                isSelected: model.name == providerManager.selectedModel
                             ) {
-                                ollamaManager.selectedModel = model.name
+                                providerManager.setSelectedModel(model.name)
                                 dismiss()
                             }
                         }
@@ -1306,7 +1337,7 @@ struct ModelPickerView: View {
                 .frame(maxHeight: 300)
             }
             
-            if let error = ollamaManager.error {
+            if let error = providerManager.error {
                 Text("Error: \(error)")
                     .font(.caption)
                     .foregroundColor(.red)
@@ -1314,19 +1345,20 @@ struct ModelPickerView: View {
             }
         }
         .padding(16)
-        .frame(minWidth: 280)
+        .frame(minWidth: 320)
         .onAppear {
-            if ollamaManager.availableModels.isEmpty {
+            selectedProvider = providerManager.selectedProvider
+            if providerManager.availableModels.isEmpty {
                 Task {
-                    await ollamaManager.fetchModels()
+                    await providerManager.refreshAllModels()
                 }
             }
         }
     }
 }
 
-struct ModelRow: View {
-    let model: OllamaModel
+struct AIModelRow: View {
+    let model: AIModel
     let isSelected: Bool
     let onSelect: () -> Void
     
@@ -1340,23 +1372,15 @@ struct ModelRow: View {
                         .lineLimit(1)
                     
                     HStack(spacing: 8) {
-                        if let details = model.details {
-                            if let paramSize = details.parameterSize {
-                                Text(paramSize)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            if let quantization = details.quantizationLevel {
-                                Text(quantization)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        
-                        Text(model.sizeFormatted)
+                        Text(model.provider.displayName)
                             .font(.caption2)
                             .foregroundColor(.secondary)
+                        
+                        if !model.isEnabled {
+                            Text("Disabled")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                        }
                     }
                 }
                 
@@ -1372,8 +1396,10 @@ struct ModelRow: View {
             .padding(.vertical, 8)
             .background(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
             .clipShape(RoundedRectangle(cornerRadius: 6))
+            .opacity(model.isEnabled ? 1.0 : 0.6)
         }
         .buttonStyle(.plain)
+        .disabled(!model.isEnabled)
     }
 }
 
@@ -1399,7 +1425,7 @@ struct FloatingChatView: View {
     @Binding var isGenerating: Bool
     @Binding var currentTask: Task<Void, Never>?
     @ObservedObject var textSelectionManager: TextSelectionManager
-    @ObservedObject var ollamaManager: OllamaManager
+    @ObservedObject var providerManager: AIProviderManager
     @Binding var showModelPicker: Bool
     @FocusState private var isInputFocused: Bool
     
@@ -1424,7 +1450,7 @@ struct FloatingChatView: View {
                             .font(.system(size: 12))
                             .foregroundColor(.gray)
                         
-                        Text(ollamaManager.selectedModel.isEmpty ? "Select Model" : ollamaManager.selectedModel.replacingOccurrences(of: ":latest", with: ""))
+                        Text(providerManager.selectedModel.isEmpty ? "Select Model" : providerManager.selectedModel.replacingOccurrences(of: ":latest", with: ""))
                             .font(.system(size: 12))
                             .foregroundColor(.white)
                             .lineLimit(1)
@@ -1572,7 +1598,7 @@ struct FloatingChatView: View {
         .background(Color(red: 0.11, green: 0.11, blue: 0.11))
         .onAppear {
             Task {
-                await ollamaManager.fetchModels()
+                await providerManager.refreshAllModels()
             }
         }
     }
