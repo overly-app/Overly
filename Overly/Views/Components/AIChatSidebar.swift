@@ -9,9 +9,14 @@ import SwiftUI
 
 struct AIChatMessage: Identifiable {
     let id = UUID()
-    let content: String
+    var content: String
     let isUser: Bool
     let timestamp: Date = Date()
+    
+    init(content: String, isUser: Bool) {
+        self.content = content
+        self.isUser = isUser
+    }
 }
 
 struct AIChatSidebar: View {
@@ -21,6 +26,8 @@ struct AIChatSidebar: View {
     @State private var isTyping: Bool = false
     @FocusState private var isInputFocused: Bool
     @StateObject private var textSelectionManager = TextSelectionManager.shared
+    @StateObject private var ollamaManager = OllamaManager.shared
+    @State private var showModelPicker = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -40,28 +47,73 @@ struct AIChatSidebar: View {
     }
     
     private var headerView: some View {
-        HStack {
-            Text("AI Assistant")
-                .font(.headline)
-                .foregroundColor(.white)
-            
-            Spacer()
-            
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    isVisible = false
+        VStack(spacing: 8) {
+            HStack {
+                Text("AI Assistant")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        isVisible = false
+                    }
+                }) {
+                    Image(systemName: "xmark")
+                        .foregroundColor(.gray)
+                        .font(.system(size: 14, weight: .medium))
                 }
-            }) {
-                Image(systemName: "xmark")
-                    .foregroundColor(.gray)
-                    .font(.system(size: 14, weight: .medium))
+                .buttonStyle(.plain)
+                .help("Close sidebar")
             }
-            .buttonStyle(.plain)
-            .help("Close sidebar")
+            
+            // Model picker
+            HStack {
+                Button(action: {
+                    showModelPicker.toggle()
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "brain")
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                        
+                        Text(ollamaManager.selectedModel.isEmpty ? "Select Model" : ollamaManager.selectedModel.replacingOccurrences(of: ":latest", with: ""))
+                            .font(.system(size: 12))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                        
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10))
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showModelPicker) {
+                    ModelPickerView()
+                }
+                
+                Spacer()
+                
+                if ollamaManager.isLoading {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                        .progressViewStyle(CircularProgressViewStyle(tint: .gray))
+                }
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(Color(red: 0.11, green: 0.11, blue: 0.11))
+        .onAppear {
+            Task {
+                await ollamaManager.fetchModels()
+            }
+        }
     }
     
     private var messagesView: some View {
@@ -80,7 +132,7 @@ struct AIChatSidebar: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
             }
-            .onChange(of: messages.count) { _ in
+            .onChange(of: messages.count) {
                 if let lastMessage = messages.last {
                     withAnimation(.easeOut(duration: 0.3)) {
                         proxy.scrollTo(lastMessage.id, anchor: .bottom)
@@ -147,46 +199,86 @@ struct AIChatSidebar: View {
         // Clear the attachment after sending
         textSelectionManager.clearSelection()
         
-        // Simulate AI typing
+        // Check if Ollama model is selected
+        guard !ollamaManager.selectedModel.isEmpty else {
+            let errorMessage = AIChatMessage(content: "Please select an Ollama model first.", isUser: false)
+            messages.append(errorMessage)
+            return
+        }
+        
+        // Show typing indicator
         isTyping = true
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            isTyping = false
-            let aiResponse = generateMockResponse(for: messageToSend, withContext: selectedText)
-            let aiMessage = AIChatMessage(content: aiResponse, isUser: false)
-            messages.append(aiMessage)
+        Task {
+            do {
+                // Prepare messages for Ollama
+                var ollamaMessages: [OllamaChatMessage] = []
+                
+                // Add context if there's selected text
+                if let context = selectedText {
+                    ollamaMessages.append(OllamaChatMessage(
+                        role: "system",
+                        content: "The user has selected this text for context: \"\(context)\". Please reference this in your response if relevant."
+                    ))
+                }
+                
+                // Add conversation history (last few messages for context)
+                let recentMessages = messages.suffix(6) // Last 6 messages for context
+                for msg in recentMessages {
+                    if msg.id != userMessage.id { // Don't include the message we just added
+                        ollamaMessages.append(OllamaChatMessage(
+                            role: msg.isUser ? "user" : "assistant",
+                            content: msg.content
+                        ))
+                    }
+                }
+                
+                // Add the current user message
+                ollamaMessages.append(OllamaChatMessage(role: "user", content: messageToSend))
+                
+                // Send to Ollama and stream response
+                let stream = try await ollamaManager.sendChatMessage(messages: ollamaMessages)
+                
+                await MainActor.run {
+                    isTyping = false
+                }
+                
+                // Create AI message and stream content
+                let aiMessage = AIChatMessage(content: "", isUser: false)
+                await MainActor.run {
+                    messages.append(aiMessage)
+                }
+                
+                var fullResponse = ""
+                for try await chunk in stream {
+                    fullResponse += chunk
+                    await MainActor.run {
+                        if let index = messages.firstIndex(where: { $0.id == aiMessage.id }) {
+                            messages[index] = AIChatMessage(content: fullResponse, isUser: false)
+                        }
+                    }
+                }
+                
+            } catch {
+                await MainActor.run {
+                    isTyping = false
+                    let errorMessage = AIChatMessage(content: "Error: \(error.localizedDescription)", isUser: false)
+                    messages.append(errorMessage)
+                }
+            }
         }
     }
     
     private func loadInitialMessages() {
-        messages = [
-            AIChatMessage(content: "Sure thing! Here's a mock AI chat for you.", isUser: false)
-        ]
-    }
-    
-    private func generateMockResponse(for input: String, withContext selectedText: String? = nil) -> String {
-        if let context = selectedText {
-            let contextResponses = [
-                "I can see you've selected some text: \"\(context.prefix(50))...\". Based on this context, here's what I think...",
-                "Thanks for sharing that text selection. Let me help you understand this better...",
-                "I notice you highlighted: \"\(context.prefix(50))...\". This relates to your question about...",
-                "Based on the text you selected, I can provide some insights...",
-                "That's an interesting selection! Let me explain what this means..."
+        if ollamaManager.selectedModel.isEmpty {
+            messages = [
+                AIChatMessage(content: "Hello! Please select an Ollama model to start chatting.", isUser: false)
             ]
-            return contextResponses.randomElement() ?? "Thanks for the context! I'm here to help."
+        } else {
+            messages = [
+                AIChatMessage(content: "Hello! I'm ready to help you. What would you like to know?", isUser: false)
+            ]
         }
-        
-        let responses = [
-            "I'd love to help, but I don't have real-time weather data. Maybe check your favorite weather app?",
-            "Why do programmers prefer dark mode? Because light attracts bugs.",
-            "Build something you actually want to use. Docs are great, but nothing beats hands-on chaos.",
-            "You've got options: AltStore, SideStore, TrollStore (if you're lucky with your device). Each has its quirks, but SideStore is pretty smooth for most modern devices.",
-            "Here's a simple function:\n\nfunction reverseString(str) {\n    return str.split('').reverse().join('');\n}",
-            "That's a great question! Let me think about that for a moment...",
-            "I can help you with that. What specific aspect would you like to know more about?",
-            "Interesting! Here's what I think about that topic..."
-        ]
-        return responses.randomElement() ?? "Thanks for your question! I'm here to help."
     }
 }
 
@@ -316,6 +408,136 @@ struct SelectedTextAttachmentView: View {
         .onHover { hovering in
             isHovering = hovering
         }
+    }
+}
+
+struct ModelPickerView: View {
+    @StateObject private var ollamaManager = OllamaManager.shared
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Select Ollama Model")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Spacer()
+                
+                Button("Refresh") {
+                    Task {
+                        await ollamaManager.fetchModels()
+                    }
+                }
+                .font(.caption)
+            }
+            
+            if ollamaManager.isLoading {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Loading models...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 20)
+            } else if ollamaManager.availableModels.isEmpty {
+                VStack(spacing: 8) {
+                    Text("No models found")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Text("Make sure Ollama is running and has models installed")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.vertical, 20)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 4) {
+                        ForEach(ollamaManager.availableModels) { model in
+                            ModelRow(
+                                model: model,
+                                isSelected: model.name == ollamaManager.selectedModel
+                            ) {
+                                ollamaManager.selectedModel = model.name
+                                dismiss()
+                            }
+                        }
+                    }
+                }
+                .frame(maxHeight: 300)
+            }
+            
+            if let error = ollamaManager.error {
+                Text("Error: \(error)")
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .padding(.top, 8)
+            }
+        }
+        .padding(16)
+        .frame(minWidth: 280)
+        .onAppear {
+            if ollamaManager.availableModels.isEmpty {
+                Task {
+                    await ollamaManager.fetchModels()
+                }
+            }
+        }
+    }
+}
+
+struct ModelRow: View {
+    let model: OllamaModel
+    let isSelected: Bool
+    let onSelect: () -> Void
+    
+    var body: some View {
+        Button(action: onSelect) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(model.displayName)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    
+                    HStack(spacing: 8) {
+                        if let details = model.details {
+                            if let paramSize = details.parameterSize {
+                                Text(paramSize)
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            if let quantization = details.quantizationLevel {
+                                Text(quantization)
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        Text(model.sizeFormatted)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.system(size: 16))
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
     }
 }
 
