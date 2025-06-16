@@ -6,6 +6,7 @@ import AppKit
 class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, NSWindowDelegate {
     var parent: WebView
     var popupWindow: NSWindow? // Add a property to hold the popup window
+    private var selectionTimer: Timer?
 
     init(_ parent: WebView) {
         self.parent = parent
@@ -25,6 +26,39 @@ class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, NSWindow
         
         DispatchQueue.main.async {
             self.parent.isLoading = false
+        }
+        
+        // Inject text selection detection script
+        let selectionScript = """
+        function checkSelection() {
+            const selection = window.getSelection();
+            const selectedText = selection.toString().trim();
+            
+            if (selectedText.length > 0) {
+                window.webkit.messageHandlers.textSelection.postMessage({
+                    text: selectedText,
+                    source: window.location.hostname || 'Unknown'
+                });
+            } else {
+                // Clear selection when text is deselected
+                window.webkit.messageHandlers.textSelection.postMessage({
+                    text: '',
+                    source: ''
+                });
+            }
+        }
+        
+        document.addEventListener('mouseup', checkSelection);
+        document.addEventListener('keyup', checkSelection);
+        document.addEventListener('selectionchange', checkSelection);
+        
+        console.log('Text selection detection initialized');
+        """
+        
+        webView.evaluateJavaScript(selectionScript) { result, error in
+            if let error = error {
+                print("Text selection script error: \(error)")
+            }
         }
         
         // Inject additional WebAuthn debugging if needed

@@ -2,6 +2,20 @@ import SwiftUI
 import WebKit
 import AuthenticationServices
 
+class TextSelectionMessageHandler: NSObject, WKScriptMessageHandler {
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard let body = message.body as? [String: Any],
+              let text = body["text"] as? String,
+              let source = body["source"] as? String else {
+            return
+        }
+        
+        DispatchQueue.main.async {
+            TextSelectionManager.shared.setSelectedText(text, source: source)
+        }
+    }
+}
+
 class WebViewConfiguration {
     static func createConfiguration() -> WKWebViewConfiguration {
         // Configure preferences for passkey support
@@ -23,6 +37,10 @@ class WebViewConfiguration {
         
         // Configure user content controller for better WebAuthn support
         let userContentController = WKUserContentController()
+        
+        // Add text selection message handler
+        let textSelectionHandler = TextSelectionMessageHandler()
+        userContentController.add(textSelectionHandler, name: "textSelection")
         
         // Add JavaScript to enhance WebAuthn compatibility
         let webAuthnScript = createWebAuthnScript()

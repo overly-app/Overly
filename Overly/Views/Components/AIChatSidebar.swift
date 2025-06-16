@@ -20,6 +20,7 @@ struct AIChatSidebar: View {
     @State private var inputText: String = ""
     @State private var isTyping: Bool = false
     @FocusState private var isInputFocused: Bool
+    @StateObject private var textSelectionManager = TextSelectionManager.shared
     
     var body: some View {
         VStack(spacing: 0) {
@@ -90,35 +91,46 @@ struct AIChatSidebar: View {
     }
     
     private var inputView: some View {
-        HStack(spacing: 8) {
+        VStack(spacing: 0) {
             HStack(spacing: 8) {
-                TextField("Ask another question...", text: $inputText)
-                    .textFieldStyle(.plain)
-                    .foregroundColor(.white)
-                    .font(.system(size: 14))
-                    .focused($isInputFocused)
-                    .onSubmit {
-                        sendMessage()
+                VStack(spacing: 8) {
+                    // Selected text attachment inside input box
+                    if let attachment = textSelectionManager.selectedAttachment {
+                        SelectedTextAttachmentView(attachment: attachment) {
+                            textSelectionManager.clearSelection()
+                        }
                     }
-                
-                Button(action: sendMessage) {
-                    Image(systemName: "arrow.up")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 24, height: 24)
-                        .background(inputText.isEmpty ? Color.gray.opacity(0.4) : Color(red: 0.0, green: 0.48, blue: 0.4))
-                        .clipShape(Circle())
+                    
+                    HStack(spacing: 8) {
+                        TextField("Ask another question...", text: $inputText)
+                            .textFieldStyle(.plain)
+                            .foregroundColor(.white)
+                            .font(.system(size: 14))
+                            .focused($isInputFocused)
+                            .onSubmit {
+                                sendMessage()
+                            }
+                        
+                        Button(action: sendMessage) {
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(width: 24, height: 24)
+                                .background(inputText.isEmpty ? Color.gray.opacity(0.4) : Color(red: 0.0, green: 0.48, blue: 0.4))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(inputText.isEmpty)
+                    }
                 }
-                .buttonStyle(.plain)
-                .disabled(inputText.isEmpty)
+                .padding(.horizontal, 14)
+                .padding(.vertical, textSelectionManager.selectedAttachment != nil ? 12 : 14) // Dynamic padding based on attachment
+                .background(Color(red: 0.15, green: 0.15, blue: 0.15)) // Slightly lighter than main background
+                .clipShape(RoundedRectangle(cornerRadius: 24))
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 14) // Increased vertical padding to make it taller
-            .background(Color(red: 0.15, green: 0.15, blue: 0.15)) // Slightly lighter than main background
-            .clipShape(RoundedRectangle(cornerRadius: 24)) // Increased corner radius for taller input
+            .padding(.horizontal, 16)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 16) // Increased padding around the input area
+        .padding(.vertical, 16)
         .background(Color(red: 0.11, green: 0.11, blue: 0.11))
     }
     
@@ -129,14 +141,18 @@ struct AIChatSidebar: View {
         messages.append(userMessage)
         
         let messageToSend = inputText
+        let selectedText = textSelectionManager.selectedAttachment?.text
         inputText = ""
+        
+        // Clear the attachment after sending
+        textSelectionManager.clearSelection()
         
         // Simulate AI typing
         isTyping = true
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             isTyping = false
-            let aiResponse = generateMockResponse(for: messageToSend)
+            let aiResponse = generateMockResponse(for: messageToSend, withContext: selectedText)
             let aiMessage = AIChatMessage(content: aiResponse, isUser: false)
             messages.append(aiMessage)
         }
@@ -148,7 +164,18 @@ struct AIChatSidebar: View {
         ]
     }
     
-    private func generateMockResponse(for input: String) -> String {
+    private func generateMockResponse(for input: String, withContext selectedText: String? = nil) -> String {
+        if let context = selectedText {
+            let contextResponses = [
+                "I can see you've selected some text: \"\(context.prefix(50))...\". Based on this context, here's what I think...",
+                "Thanks for sharing that text selection. Let me help you understand this better...",
+                "I notice you highlighted: \"\(context.prefix(50))...\". This relates to your question about...",
+                "Based on the text you selected, I can provide some insights...",
+                "That's an interesting selection! Let me explain what this means..."
+            ]
+            return contextResponses.randomElement() ?? "Thanks for the context! I'm here to help."
+        }
+        
         let responses = [
             "I'd love to help, but I don't have real-time weather data. Maybe check your favorite weather app?",
             "Why do programmers prefer dark mode? Because light attracts bugs.",
@@ -226,6 +253,68 @@ struct TypingIndicator: View {
             withAnimation(.easeInOut(duration: 0.6).repeatForever()) {
                 animationPhase = (animationPhase + 1) % 3
             }
+        }
+    }
+}
+
+struct SelectedTextAttachmentView: View {
+    let attachment: SelectedTextAttachment
+    let onRemove: () -> Void
+    @State private var isHovering = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                // AI icon
+                HStack(spacing: 6) {
+                    Text("AI")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.white)
+                        .frame(width: 16, height: 16)
+                        .background(Color.gray.opacity(0.6))
+                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                    
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(attachment.source)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white)
+                        
+                        Text("Selected Text")
+                            .font(.system(size: 9))
+                            .foregroundColor(.gray)
+                    }
+                }
+                
+                Spacer()
+                
+                // Close button (appears on hover)
+                if isHovering {
+                    Button(action: onRemove) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundColor(.gray)
+                            .frame(width: 14, height: 14)
+                            .background(Color.black.opacity(0.3))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            
+            // Selected text content
+            Text(attachment.text)
+                .font(.system(size: 10))
+                .foregroundColor(.white.opacity(0.7))
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .padding(.leading, 22) // Align with the text above
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color(red: 0.1, green: 0.1, blue: 0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .onHover { hovering in
+            isHovering = hovering
         }
     }
 }
