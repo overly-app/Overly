@@ -16,13 +16,16 @@ struct ContentView: View {
     @State private var isLoading: Bool = false
     @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
     @State private var showCommandPalette: Bool = false
+    @State private var showAISidebar: Bool = false
+    @State private var sidebarWidth: CGFloat = 300
     @AppStorage("useNativeChat") var useNativeChat: Bool = false
 
     var body: some View {
         if hasCompletedOnboarding {
             ZStack {
-                // Main content
+                // Main content with full-width title bar
                 VStack(spacing: 0) {
+                    // Full-width title bar
                     CustomTitleBar(
                         window: window,
                         selectedProvider: $selectedProvider,
@@ -31,20 +34,35 @@ struct ContentView: View {
                         useNativeChat: $useNativeChat
                     )
                     
-                    // Content area - either WebView or Native Chat
-                    if useNativeChat {
-                        NativeChatView()
-                    } else {
-                        // WebView with overlaid progress bar
-                        ZStack(alignment: .top) {
-                            if let provider = selectedProvider, let url = provider.url {
-                                WebView(url: url, isLoading: $isLoading)
+                    // Content area with sidebar below title bar
+                    HStack(spacing: 0) {
+                        // Main content area
+                        Group {
+                            if useNativeChat {
+                                NativeChatView()
                             } else {
-                                Color.clear
+                                // WebView with overlaid progress bar
+                                ZStack(alignment: .top) {
+                                    if let provider = selectedProvider, let url = provider.url {
+                                        WebView(url: url, isLoading: $isLoading)
+                                    } else {
+                                        Color.clear
+                                    }
+                                    
+                                    // Progress bar overlaid at the top
+                                    ProgressBarView(isLoading: $isLoading)
+                                }
                             }
+                        }
+                        
+                        // AI Sidebar
+                        if showAISidebar {
+                            ResizableDivider(width: $sidebarWidth, minWidth: 250, maxWidth: 800)
                             
-                            // Progress bar overlaid at the top
-                            ProgressBarView(isLoading: $isLoading)
+                            AIChatSidebar(isVisible: $showAISidebar)
+                                .frame(width: sidebarWidth)
+                                .transition(.move(edge: .trailing))
+                                .allowsHitTesting(true) // Prevent window dragging conflicts
                         }
                     }
                 }
@@ -52,6 +70,7 @@ struct ContentView: View {
                     setupWindow()
                     initializeSelectedProvider()
                     fetchFaviconsForActiveProviders()
+                    setupSidebarToggle()
                 }
                 
                 // Command palette overlay (only for WebView mode)
@@ -124,6 +143,19 @@ struct ContentView: View {
     private func showCommandPaletteView() {
         windowManager.focusCustomWindow()
         showCommandPalette = true
+    }
+    
+    // Setup sidebar toggle
+    private func setupSidebarToggle() {
+        if let window = window as? BorderlessWindow {
+            window.toggleSidebarAction = { [self] in
+                DispatchQueue.main.async {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        self.showAISidebar.toggle()
+                    }
+                }
+            }
+        }
     }
 }
 

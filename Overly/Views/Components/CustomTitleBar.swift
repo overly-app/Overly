@@ -113,9 +113,23 @@ struct CustomTitleBar: View {
         .padding(.horizontal)
         .frame(height: 30)
         .background(.thinMaterial)
-        .gesture(TapGesture(count: 2).onEnded({
-            handleDoubleClick()
-        }))
+        .gesture(
+            // Combine drag and double-tap gestures
+            DragGesture()
+                .onChanged { value in
+                    // Move the window during drag
+                    guard let window = window else { return }
+                    let currentLocation = NSEvent.mouseLocation
+                    let newOrigin = NSPoint(
+                        x: currentLocation.x - value.location.x,
+                        y: currentLocation.y - (window.frame.height - value.location.y)
+                    )
+                    window.setFrameOrigin(newOrigin)
+                }
+                .exclusively(before: TapGesture(count: 2).onEnded({
+                    handleDoubleClick()
+                }))
+        )
     }
     
     private func startCloseDropdownDelay() {

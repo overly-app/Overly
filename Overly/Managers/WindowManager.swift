@@ -110,6 +110,10 @@ class WindowManager: NSObject, ObservableObject {
         hotkeyManager.switchToNextServiceAction = { [weak self] in
             self?.customWindow?.nextServiceAction?()
         }
+        
+        hotkeyManager.toggleSidebarAction = { [weak self] in
+            self?.customWindow?.toggleSidebarAction?()
+        }
     }
     
     private func setupNotificationObservers() {

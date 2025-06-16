@@ -12,6 +12,7 @@ class BorderlessWindow: NSWindow {
     // Closures to hold actions from ContentView
     var reloadAction: (() -> Void)?
     var nextServiceAction: (() -> Void)?
+    var toggleSidebarAction: (() -> Void)?
 
     override init(
         contentRect: NSRect,
@@ -28,7 +29,7 @@ class BorderlessWindow: NSWindow {
         self.titleVisibility = .hidden
         self.isOpaque = false
         self.backgroundColor = .clear
-        self.isMovableByWindowBackground = true
+        self.isMovableByWindowBackground = false // Disable window dragging by background
         self.hasShadow = false // Ensure no native shadow
 
         // Set window level to floating so it stays above other windows

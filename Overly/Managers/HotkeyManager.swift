@@ -14,6 +14,7 @@ class HotkeyManager: ObservableObject {
     private var nextServiceHotKey: HotKey?
     private var settingsHotKey: HotKey?
     private var commandPaletteHotKey: HotKey?
+    private var toggleSidebarHotKey: HotKey?
     private var isHotkeyDisabled = false
     
     // Closures for actions
@@ -22,6 +23,7 @@ class HotkeyManager: ObservableObject {
     var switchToNextServiceAction: (() -> Void)?
     var hideWindowAction: (() -> Void)?
     var showCommandPaletteAction: (() -> Void)?
+    var toggleSidebarAction: (() -> Void)?
     
     init() {
         setupInitialHotkeys()
@@ -44,6 +46,14 @@ class HotkeyManager: ObservableObject {
         commandPaletteHotKey?.keyDownHandler = { [weak self] in
             Task { @MainActor in
                 self?.showCommandPaletteAction?()
+            }
+        }
+        
+        // Create a global hotkey for Cmd + E (toggle sidebar)
+        toggleSidebarHotKey = HotKey(key: .e, modifiers: [.command])
+        toggleSidebarHotKey?.keyDownHandler = { [weak self] in
+            Task { @MainActor in
+                self?.toggleSidebarAction?()
             }
         }
     }
