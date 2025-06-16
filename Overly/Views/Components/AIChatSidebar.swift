@@ -7,6 +7,21 @@
 
 import SwiftUI
 
+// Struct for persisting messages to UserDefaults
+struct PersistedMessage: Codable {
+    let content: String
+    let isUser: Bool
+    let responses: [String]
+    let currentResponseIndex: Int
+    
+    init(content: String, isUser: Bool, responses: [String] = [], currentResponseIndex: Int = 0) {
+        self.content = content
+        self.isUser = isUser
+        self.responses = responses
+        self.currentResponseIndex = currentResponseIndex
+    }
+}
+
 class AIChatMessage: ObservableObject, Identifiable {
     let id = UUID()
     @Published var content: String
@@ -87,7 +102,10 @@ struct AIChatSidebar: View {
         }
         .background(Color(red: 0.11, green: 0.11, blue: 0.11)) // Dark background like the image
         .onAppear {
-            loadInitialMessages()
+            loadPersistedMessages()
+        }
+        .onDisappear {
+            saveMessagesToPersistence()
         }
         .overlay(
             // Hidden button for keyboard shortcut
@@ -110,6 +128,17 @@ struct AIChatSidebar: View {
                     .foregroundColor(.white)
                 
                 Spacer()
+                
+                // New chat button
+                Button(action: {
+                    startNewChat()
+                }) {
+                    Image(systemName: "plus.message")
+                        .foregroundColor(.gray)
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                .help("Start new chat")
                 
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.15)) {
@@ -174,8 +203,8 @@ struct AIChatSidebar: View {
     
     private var messagesView: some View {
         ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 16) {
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack(spacing: 16) {
                     ForEach(messages) { message in
                         MessageBubble(message: message, onMessageEdited: {
                             // Only trigger generation if it's a user message
@@ -187,6 +216,8 @@ struct AIChatSidebar: View {
                             if !aiMessage.isUser {
                                 regenerateResponse(for: aiMessage)
                             }
+                        }, onSaveMessages: {
+                            saveMessagesToPersistence()
                         })
                             .id(message.id)
                     }
@@ -198,6 +229,9 @@ struct AIChatSidebar: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
             }
+            .scrollContentBackground(.hidden)
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicators(.visible)
             .onChange(of: messages.count) {
                 if let lastMessage = messages.last {
                     withAnimation(.easeOut(duration: 0.3)) {
@@ -368,6 +402,8 @@ struct AIChatSidebar: View {
                     aiMessage.markGenerationComplete() // Mark as complete
                     isGenerating = false
                     print("DEBUG: Set isGenerating = false (completed)")
+                    // Save messages after completion
+                    saveMessagesToPersistence()
                 }
                 
             } catch {
@@ -376,6 +412,8 @@ struct AIChatSidebar: View {
                     isGenerating = false
                     let errorMessage = AIChatMessage(content: "Error: \(error.localizedDescription)", isUser: false)
                     messages.append(errorMessage)
+                    // Save messages after error
+                    saveMessagesToPersistence()
                 }
             }
         }
@@ -390,14 +428,56 @@ struct AIChatSidebar: View {
         print("DEBUG: Set isGenerating = false (stopped)")
     }
     
-    private func loadInitialMessages() {
-        if ollamaManager.selectedModel.isEmpty {
-            messages = [
-            ]
+    private func loadPersistedMessages() {
+        // Load messages from UserDefaults
+        if let data = UserDefaults.standard.data(forKey: "AIChatMessages"),
+           let decodedMessages = try? JSONDecoder().decode([PersistedMessage].self, from: data) {
+            messages = decodedMessages.map { persistedMessage in
+                let message = AIChatMessage(content: persistedMessage.content, isUser: persistedMessage.isUser)
+                if !persistedMessage.isUser && !persistedMessage.responses.isEmpty {
+                    message.responses = persistedMessage.responses
+                    message.currentResponseIndex = persistedMessage.currentResponseIndex
+                }
+                return message
+            }
         } else {
-            messages = [
-            ]
+            // Default empty state - no initial messages
+            messages = []
         }
+    }
+    
+    private func saveMessagesToPersistence() {
+        // Convert messages to persistable format
+        let persistedMessages = messages.map { message in
+            PersistedMessage(
+                content: message.content,
+                isUser: message.isUser,
+                responses: message.responses,
+                currentResponseIndex: message.currentResponseIndex
+            )
+        }
+        
+        // Save to UserDefaults
+        if let data = try? JSONEncoder().encode(persistedMessages) {
+            UserDefaults.standard.set(data, forKey: "AIChatMessages")
+        }
+    }
+    
+    private func startNewChat() {
+        // Stop any ongoing generation
+        stopGeneration()
+        
+        // Clear all messages
+        messages.removeAll()
+        
+        // Clear input text
+        inputText = ""
+        
+        // Clear selected text attachment
+        textSelectionManager.clearSelection()
+        
+        // Save the empty state
+        saveMessagesToPersistence()
     }
     
     private func generateResponseForEditedMessage() {
@@ -473,6 +553,8 @@ struct AIChatSidebar: View {
                     aiMessage.markGenerationComplete() // Mark as complete
                     isGenerating = false
                     print("DEBUG: Set isGenerating = false (edited message completed)")
+                    // Save messages after completion
+                    saveMessagesToPersistence()
                 }
                 
             } catch {
@@ -481,6 +563,8 @@ struct AIChatSidebar: View {
                     isGenerating = false
                     let errorMessage = AIChatMessage(content: "Error: \(error.localizedDescription)", isUser: false)
                     messages.append(errorMessage)
+                    // Save messages after error
+                    saveMessagesToPersistence()
                 }
             }
         }
@@ -547,6 +631,8 @@ struct AIChatSidebar: View {
                     message.markGenerationComplete() // Mark this specific message as complete
                     isGenerating = false
                     print("DEBUG: Set isGenerating = false (regeneration completed)")
+                    // Save messages after completion
+                    saveMessagesToPersistence()
                 }
                 
             } catch {
@@ -555,6 +641,8 @@ struct AIChatSidebar: View {
                     isGenerating = false
                     let errorMessage = AIChatMessage(content: "Error: \(error.localizedDescription)", isUser: false)
                     messages.append(errorMessage)
+                    // Save messages after error
+                    saveMessagesToPersistence()
                 }
             }
         }
@@ -569,11 +657,13 @@ struct MessageBubble: View {
     @State private var showCopyFeedback = false
     let onMessageEdited: (() -> Void)?
     let onRegenerateResponse: ((AIChatMessage) -> Void)?
+    let onSaveMessages: (() -> Void)?
     
-    init(message: AIChatMessage, onMessageEdited: (() -> Void)? = nil, onRegenerateResponse: ((AIChatMessage) -> Void)? = nil) {
+    init(message: AIChatMessage, onMessageEdited: (() -> Void)? = nil, onRegenerateResponse: ((AIChatMessage) -> Void)? = nil, onSaveMessages: (() -> Void)? = nil) {
         self.message = message
         self.onMessageEdited = onMessageEdited
         self.onRegenerateResponse = onRegenerateResponse
+        self.onSaveMessages = onSaveMessages
     }
     
     var body: some View {
@@ -675,8 +765,11 @@ struct MessageBubble: View {
             }
         }
         .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isHovered = hovering
+            // Only update hover state for user messages to reduce unnecessary updates
+            if message.isUser {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isHovered = hovering
+                }
             }
         }
         .onAppear {
@@ -750,6 +843,24 @@ struct MessageBubble: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .frame(maxWidth: 280, minHeight: 60, alignment: .trailing)
                 .scrollContentBackground(.hidden)
+                .onKeyPress(.escape) {
+                    // Cancel editing on Esc
+                    editedContent = message.content
+                    isEditing = false
+                    return .handled
+                }
+                .overlay(
+                    // Hidden button for Cmd+Enter shortcut
+                    Button("") {
+                        message.content = editedContent
+                        isEditing = false
+                        onMessageEdited?()
+                        onSaveMessages?()
+                    }
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .opacity(0)
+                    .allowsHitTesting(false)
+                )
             
             // Edit action buttons
             HStack(spacing: 8) {
@@ -759,17 +870,22 @@ struct MessageBubble: View {
                 }
                 .foregroundColor(.secondary)
                 .font(.system(size: 12))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.white.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
                 
                 Button("Save") {
                     message.content = editedContent
                     isEditing = false
                     onMessageEdited?()
+                    onSaveMessages?()
                 }
                 .foregroundColor(.white)
                 .font(.system(size: 12, weight: .medium))
                 .padding(.horizontal, 12)
-                .padding(.vertical, 4)
-                .background(Color.accentColor)
+                .padding(.vertical, 6)
+                .background(Color(red: 0.0, green: 0.48, blue: 0.4))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
@@ -782,6 +898,9 @@ struct MessageBubble: View {
                 Image(systemName: showCopyFeedback ? "checkmark" : "doc.on.doc")
                     .font(.system(size: 12))
                     .foregroundColor(showCopyFeedback ? .green : .gray)
+                    .frame(width: 24, height: 24)
+                    .background(Color.white.opacity(0.1))
+                    .clipShape(Circle())
             }
             .buttonStyle(.plain)
             .help("Copy message")
@@ -792,15 +911,22 @@ struct MessageBubble: View {
                     Image(systemName: "pencil")
                         .font(.system(size: 12))
                         .foregroundColor(.gray)
+                        .frame(width: 24, height: 24)
+                        .background(Color.white.opacity(0.1))
+                        .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
                 .help("Edit message")
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Color.black.opacity(0.6))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.black.opacity(0.3))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .transition(.asymmetric(
+            insertion: .move(edge: .trailing).combined(with: .opacity),
+            removal: .move(edge: .trailing).combined(with: .opacity)
+        ))
     }
     
     // MARK: - Actions
