@@ -189,11 +189,19 @@ struct AIChatSidebar: View {
     private func sendMessage() {
         guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         
-        let userMessage = AIChatMessage(content: inputText, isUser: true)
+        // Prepare the user message content
+        var userMessageContent = inputText
+        let selectedText = textSelectionManager.selectedAttachment?.text
+        
+        // If there's selected text, include it in the user message display
+        if let context = selectedText {
+            userMessageContent = "**Selected text:** \"\(context)\"\n\n**Question:** \(inputText)"
+        }
+        
+        let userMessage = AIChatMessage(content: userMessageContent, isUser: true)
         messages.append(userMessage)
         
         let messageToSend = inputText
-        let selectedText = textSelectionManager.selectedAttachment?.text
         inputText = ""
         
         // Clear the attachment after sending
@@ -218,7 +226,7 @@ struct AIChatSidebar: View {
                 if let context = selectedText {
                     ollamaMessages.append(OllamaChatMessage(
                         role: "system",
-                        content: "The user has selected this text for context: \"\(context)\". Please reference this in your response if relevant."
+                        content: "The user has selected this text from a webpage: \"\(context)\". Please analyze this text and answer their question in relation to it. Reference specific parts of the selected text when relevant."
                     ))
                 }
                 
@@ -290,14 +298,57 @@ struct MessageBubble: View {
             if message.isUser {
                 Spacer()
                 
-                Text(message.content)
-                    .font(.system(size: 14))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Color(red: 0.0, green: 0.48, blue: 0.4)) // Green like in the image
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .frame(maxWidth: 250, alignment: .trailing)
+                VStack(alignment: .trailing, spacing: 6) {
+                    // Parse and display the message content
+                    if message.content.contains("**Selected text:**") {
+                        // This is a message with selected text
+                        let components = message.content.components(separatedBy: "\n\n**Question:** ")
+                        if components.count == 2 {
+                            let selectedTextPart = components[0].replacingOccurrences(of: "**Selected text:** \"", with: "").replacingOccurrences(of: "\"", with: "")
+                            let questionPart = components[1]
+                            
+                            // Selected text context (smaller, lighter)
+                            Text("📄 \(selectedTextPart)")
+                                .font(.system(size: 11))
+                                .foregroundColor(.white.opacity(0.8))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.white.opacity(0.1))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .frame(maxWidth: 280, alignment: .trailing)
+                            
+                            // User's question (main message)
+                            Text(questionPart)
+                                .font(.system(size: 14))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color(red: 0.0, green: 0.48, blue: 0.4))
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .frame(maxWidth: 280, alignment: .trailing)
+                        } else {
+                            // Fallback to regular display
+                            Text(message.content)
+                                .font(.system(size: 14))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color(red: 0.0, green: 0.48, blue: 0.4))
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .frame(maxWidth: 280, alignment: .trailing)
+                        }
+                    } else {
+                        // Regular message without selected text
+                        Text(message.content)
+                            .font(.system(size: 14))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color(red: 0.0, green: 0.48, blue: 0.4))
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .frame(maxWidth: 280, alignment: .trailing)
+                    }
+                }
             } else {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("AI:")

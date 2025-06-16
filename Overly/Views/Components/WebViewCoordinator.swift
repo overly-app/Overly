@@ -30,27 +30,64 @@ class WebViewCoordinator: NSObject, WKNavigationDelegate, WKUIDelegate, NSWindow
         
         // Inject text selection detection script
         let selectionScript = """
-        function checkSelection() {
+        let lastSelectedText = '';
+        let clearSelectionTimeout = null;
+        
+        function checkSelection(event) {
             const selection = window.getSelection();
             const selectedText = selection.toString().trim();
             
             if (selectedText.length > 0) {
+                lastSelectedText = selectedText;
+                // Clear any pending clear timeout
+                if (clearSelectionTimeout) {
+                    clearTimeout(clearSelectionTimeout);
+                    clearSelectionTimeout = null;
+                }
+                
                 window.webkit.messageHandlers.textSelection.postMessage({
                     text: selectedText,
                     source: window.location.hostname || 'Unknown'
                 });
-            } else {
-                // Clear selection when text is deselected
-                window.webkit.messageHandlers.textSelection.postMessage({
-                    text: '',
-                    source: ''
-                });
+            } else if (lastSelectedText.length > 0) {
+                // Only clear if this was triggered by an intentional user action
+                // Add a small delay to prevent clearing when focus just changes
+                clearSelectionTimeout = setTimeout(() => {
+                    // Double-check that selection is still empty and document has focus
+                    const currentSelection = window.getSelection();
+                    const currentText = currentSelection.toString().trim();
+                    
+                    if (currentText.length === 0) {
+                        lastSelectedText = '';
+                        window.webkit.messageHandlers.textSelection.postMessage({
+                            text: '',
+                            source: ''
+                        });
+                    }
+                }, 100); // 100ms delay
             }
         }
         
+        // Only listen to intentional user actions, not focus changes
         document.addEventListener('mouseup', checkSelection);
         document.addEventListener('keyup', checkSelection);
-        document.addEventListener('selectionchange', checkSelection);
+        
+        // Handle case where user clicks elsewhere on the page to deselect
+        document.addEventListener('click', function(event) {
+            // Small delay to let selection change take effect
+            setTimeout(() => {
+                const selection = window.getSelection();
+                const selectedText = selection.toString().trim();
+                
+                if (selectedText.length === 0 && lastSelectedText.length > 0) {
+                    lastSelectedText = '';
+                    window.webkit.messageHandlers.textSelection.postMessage({
+                        text: '',
+                        source: ''
+                    });
+                }
+            }, 50);
+        });
         
         console.log('Text selection detection initialized');
         """
