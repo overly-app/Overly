@@ -17,7 +17,6 @@ struct ContentView: View {
     @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
     @State private var showCommandPalette: Bool = false
     @State private var showAISidebar: Bool = false
-    @State private var sidebarWidth: CGFloat = 300
     @AppStorage("useNativeChat") var useNativeChat: Bool = false
 
     var body: some View {
@@ -57,10 +56,13 @@ struct ContentView: View {
                         
                         // AI Sidebar
                         if showAISidebar {
-                            ResizableDivider(width: $sidebarWidth, minWidth: 250, maxWidth: 800)
+                            ResizableDivider(width: Binding(
+                                get: { settings.sidebarWidth },
+                                set: { settings.updateSidebarWidth($0) }
+                            ), minWidth: 250, maxWidth: 800)
                             
                             AIChatSidebar(isVisible: $showAISidebar)
-                                .frame(width: sidebarWidth)
+                                .frame(width: settings.sidebarWidth)
                                 .transition(.move(edge: .trailing))
                                 .allowsHitTesting(true) // Prevent window dragging conflicts
                         }

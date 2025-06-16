@@ -40,6 +40,7 @@ class AppSettings: ObservableObject, @unchecked Sendable {
     private let showInDockKey = "showInDock"
     private let windowFrameKey = "windowFrame"
     private let defaultProviderIdKey = "defaultProviderId"
+    private let sidebarWidthKey = "sidebarWidth"
 
     @Published var customProviders: [ChatProvider] = []
     @Published var activeProviderIds: Set<String> = Set()
@@ -49,6 +50,7 @@ class AppSettings: ObservableObject, @unchecked Sendable {
     @Published var toggleHotkeyModifiers: NSEvent.ModifierFlags = [.command]
     @Published var windowFrame: NSRect = NSRect(x: 0, y: 0, width: 500, height: 600)
     @Published var defaultProviderId: String?
+    @Published var sidebarWidth: CGFloat = 300
     
     // Computed property to get all providers (built-in + custom)
     var allBuiltInProviders: [ChatProvider] {
@@ -129,6 +131,10 @@ class AppSettings: ObservableObject, @unchecked Sendable {
         
         // Load default provider ID
         defaultProviderId = userDefaults.string(forKey: defaultProviderIdKey)
+        
+        // Load sidebar width
+        let defaultSidebarWidth = (NSScreen.main?.frame.width ?? 900) / 3
+        sidebarWidth = userDefaults.object(forKey: sidebarWidthKey) as? CGFloat ?? defaultSidebarWidth
     }
     
     func saveSettings() {
@@ -166,6 +172,9 @@ class AppSettings: ObservableObject, @unchecked Sendable {
         } else {
             userDefaults.removeObject(forKey: defaultProviderIdKey)
         }
+        
+        // Save sidebar width
+        userDefaults.set(sidebarWidth, forKey: sidebarWidthKey)
         
         // Force synchronization to disk
         userDefaults.synchronize()
@@ -294,6 +303,12 @@ class AppSettings: ObservableObject, @unchecked Sendable {
     // Method to update window frame
     func updateWindowFrame(_ frame: NSRect) {
         windowFrame = frame
+        saveSettings()
+    }
+    
+    // Method to update sidebar width
+    func updateSidebarWidth(_ width: CGFloat) {
+        sidebarWidth = width
         saveSettings()
     }
 }

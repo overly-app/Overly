@@ -48,14 +48,6 @@ class HotkeyManager: ObservableObject {
                 self?.showCommandPaletteAction?()
             }
         }
-        
-        // Create a global hotkey for Cmd + E (toggle sidebar)
-        toggleSidebarHotKey = HotKey(key: .e, modifiers: [.command])
-        toggleSidebarHotKey?.keyDownHandler = { [weak self] in
-            Task { @MainActor in
-                self?.toggleSidebarAction?()
-            }
-        }
     }
     
     private func setupNotificationObservers() {
@@ -135,11 +127,20 @@ class HotkeyManager: ObservableObject {
         nextServiceHotKey?.keyDownHandler = { [weak self] in
             self?.switchToNextServiceAction?()
         }
+        
+        // Create the context hotkey for Cmd + E (toggle sidebar)
+        toggleSidebarHotKey = HotKey(key: .e, modifiers: [.command])
+        toggleSidebarHotKey?.keyDownHandler = { [weak self] in
+            Task { @MainActor in
+                self?.toggleSidebarAction?()
+            }
+        }
     }
     
     func disableContextHotkeys() {
         reloadHotKey = nil
         nextServiceHotKey = nil
+        toggleSidebarHotKey = nil
     }
     
     deinit {
