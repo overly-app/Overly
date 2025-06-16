@@ -14,6 +14,18 @@ class ChatAPIManager: ObservableObject {
     private let keychainManager = KeychainManager.shared
     private let urlSession = URLSession.shared
     
+    // Map ChatProviderType to KeychainManager.APIProvider
+    private func mapToAPIProvider(_ chatProvider: ChatProviderType) -> KeychainManager.APIProvider? {
+        switch chatProvider {
+        case .openai:
+            return .openai
+        case .gemini:
+            return .gemini
+        case .groq:
+            return .customOpenAI // Groq uses OpenAI-compatible API
+        }
+    }
+    
     private init() {}
     
     // MARK: - Main Chat Method
@@ -26,7 +38,8 @@ class ChatAPIManager: ObservableObject {
         temperature: Double = 0.7
     ) async throws -> String {
         
-        guard let apiKey = keychainManager.retrieveAPIKey(for: provider) else {
+        guard let apiProvider = mapToAPIProvider(provider),
+              let apiKey = keychainManager.getAPIKey(for: apiProvider) else {
             throw ChatError.invalidAPIKey
         }
         
@@ -65,7 +78,8 @@ class ChatAPIManager: ObservableObject {
     ) {
         Task {
             do {
-                guard let apiKey = keychainManager.retrieveAPIKey(for: provider) else {
+                guard let apiProvider = mapToAPIProvider(provider),
+                      let apiKey = keychainManager.getAPIKey(for: apiProvider) else {
                     throw ChatError.invalidAPIKey
                 }
                 
@@ -410,7 +424,8 @@ class ChatAPIManager: ObservableObject {
     // MARK: - Model Fetching
     
     func fetchAvailableModels(for provider: ChatProviderType) async throws -> [String] {
-        guard let apiKey = keychainManager.retrieveAPIKey(for: provider) else {
+        guard let apiProvider = mapToAPIProvider(provider),
+              let apiKey = keychainManager.getAPIKey(for: apiProvider) else {
             throw ChatError.invalidAPIKey
         }
         

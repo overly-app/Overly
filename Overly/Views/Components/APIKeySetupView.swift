@@ -447,19 +447,8 @@ struct APIKeySetupView: View {
         validationResult = nil
         
         Task {
-            // First do basic validation
-            let isValidFormat = await KeychainManager.shared.validateAPIKey(apiKey, for: selectedProvider)
-            
-            if !isValidFormat {
-                await MainActor.run {
-                    validationResult = .failure("Invalid API key format")
-                    isValidating = false
-                }
-                return
-            }
-            
             // Store temporarily for testing
-            let tempStored = KeychainManager.shared.storeAPIKey(apiKey, for: selectedProvider)
+            let tempStored = chatManager.storeAPIKey(apiKey, for: selectedProvider)
             
             if tempStored {
                 let isValid = await chatManager.testAPIKey(for: selectedProvider)
@@ -470,7 +459,7 @@ struct APIKeySetupView: View {
                     } else {
                         validationResult = .failure("API key test failed. Please check your key.")
                         // Remove the invalid key
-                        KeychainManager.shared.deleteAPIKey(for: selectedProvider)
+                        chatManager.deleteAPIKey(for: selectedProvider)
                     }
                     isValidating = false
                 }

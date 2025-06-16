@@ -11,21 +11,82 @@ import Security
 class KeychainManager {
     static let shared = KeychainManager()
     
-    private let service = "com.overly.apikeys"
-    
     private init() {}
     
-    // MARK: - API Key Storage
+    private let service = "com.hypackel.overlyapp"
     
-    func storeAPIKey(_ key: String, for provider: ChatProviderType) -> Bool {
-        let keyData = key.data(using: .utf8)!
+    enum APIProvider: String, CaseIterable {
+        case openai = "openai"
+        case anthropic = "anthropic"
+        case gemini = "gemini"
+        case ollama = "ollama"
+        case customOpenAI = "custom_openai"
+        
+        var displayName: String {
+            switch self {
+            case .openai: return "OpenAI"
+            case .anthropic: return "Anthropic"
+            case .gemini: return "Google Gemini"
+            case .ollama: return "Ollama"
+            case .customOpenAI: return "Custom OpenAI"
+            }
+        }
+        
+        var defaultBaseURL: String {
+            switch self {
+            case .openai: return "https://api.openai.com/v1"
+            case .anthropic: return "https://api.anthropic.com"
+            case .gemini: return "https://generativelanguage.googleapis.com/v1beta"
+            case .ollama: return "http://localhost:11434"
+            case .customOpenAI: return ""
+            }
+        }
+    }
+    
+    // MARK: - API Key Management
+    
+    func saveAPIKey(_ key: String, for provider: APIProvider) -> Bool {
+        let account = "\(provider.rawValue)_api_key"
+        return saveToKeychain(key: key, account: account)
+    }
+    
+    func getAPIKey(for provider: APIProvider) -> String? {
+        let account = "\(provider.rawValue)_api_key"
+        return getFromKeychain(account: account)
+    }
+    
+    func deleteAPIKey(for provider: APIProvider) -> Bool {
+        let account = "\(provider.rawValue)_api_key"
+        return deleteFromKeychain(account: account)
+    }
+    
+    // MARK: - Base URL Management
+    
+    func saveBaseURL(_ url: String, for provider: APIProvider) -> Bool {
+        let account = "\(provider.rawValue)_base_url"
+        return saveToKeychain(key: url, account: account)
+    }
+    
+    func getBaseURL(for provider: APIProvider) -> String? {
+        let account = "\(provider.rawValue)_base_url"
+        return getFromKeychain(account: account) ?? provider.defaultBaseURL
+    }
+    
+    func deleteBaseURL(for provider: APIProvider) -> Bool {
+        let account = "\(provider.rawValue)_base_url"
+        return deleteFromKeychain(account: account)
+    }
+    
+    // MARK: - Private Keychain Operations
+    
+    private func saveToKeychain(key: String, account: String) -> Bool {
+        let data = key.data(using: .utf8)!
         
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: provider.rawValue,
-            kSecValueData as String: keyData,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            kSecAttrAccount as String: account,
+            kSecValueData as String: data
         ]
         
         // Delete existing item first
@@ -33,21 +94,14 @@ class KeychainManager {
         
         // Add new item
         let status = SecItemAdd(query as CFDictionary, nil)
-        
-        if status == errSecSuccess {
-            print("KeychainManager: Successfully stored API key for \(provider.rawValue)")
-            return true
-        } else {
-            print("KeychainManager: Failed to store API key for \(provider.rawValue), status: \(status)")
-            return false
-        }
+        return status == errSecSuccess
     }
     
-    func retrieveAPIKey(for provider: ChatProviderType) -> String? {
+    private func getFromKeychain(account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: provider.rawValue,
+            kSecAttrAccount as String: account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
@@ -55,67 +109,23 @@ class KeychainManager {
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         
-        if status == errSecSuccess,
-           let data = result as? Data,
-           let key = String(data: data, encoding: .utf8) {
-            return key
-        } else {
-            if status != errSecItemNotFound {
-                print("KeychainManager: Failed to retrieve API key for \(provider.rawValue), status: \(status)")
-            }
+        guard status == errSecSuccess,
+              let data = result as? Data,
+              let string = String(data: data, encoding: .utf8) else {
             return nil
         }
+        
+        return string
     }
     
-    func deleteAPIKey(for provider: ChatProviderType) -> Bool {
+    private func deleteFromKeychain(account: String) -> Bool {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: provider.rawValue
+            kSecAttrAccount as String: account
         ]
         
         let status = SecItemDelete(query as CFDictionary)
-        
-        if status == errSecSuccess || status == errSecItemNotFound {
-            print("KeychainManager: Successfully deleted API key for \(provider.rawValue)")
-            return true
-        } else {
-            print("KeychainManager: Failed to delete API key for \(provider.rawValue), status: \(status)")
-            return false
-        }
-    }
-    
-    func hasAPIKey(for provider: ChatProviderType) -> Bool {
-        return retrieveAPIKey(for: provider) != nil
-    }
-    
-    // MARK: - Validation
-    
-    func validateAPIKey(_ key: String, for provider: ChatProviderType) async -> Bool {
-        guard !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return false
-        }
-        
-        // Basic format validation
-        switch provider {
-        case .openai:
-            return key.hasPrefix("sk-") && key.count > 20
-        case .gemini:
-            return key.count > 20 // Gemini keys are typically longer
-        case .groq:
-            return key.hasPrefix("gsk_") && key.count > 20
-        }
-    }
-    
-    // MARK: - Utility
-    
-    func getAllStoredProviders() -> [ChatProviderType] {
-        return ChatProviderType.allCases.filter { hasAPIKey(for: $0) }
-    }
-    
-    func clearAllAPIKeys() {
-        for provider in ChatProviderType.allCases {
-            _ = deleteAPIKey(for: provider)
-        }
+        return status == errSecSuccess || status == errSecItemNotFound
     }
 } 

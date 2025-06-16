@@ -28,6 +28,23 @@ class ChatManager: ObservableObject {
     private let keychainManager = KeychainManager.shared
     private var cancellables = Set<AnyCancellable>()
     
+    // Map ChatProviderType to KeychainManager.APIProvider
+    private func mapToAPIProvider(_ chatProvider: ChatProviderType) -> KeychainManager.APIProvider? {
+        switch chatProvider {
+        case .openai:
+            return .openai
+        case .gemini:
+            return .gemini
+        case .groq:
+            return .customOpenAI // Groq uses OpenAI-compatible API
+        }
+    }
+    
+    // Get all providers that have stored API keys
+    private func getAllStoredProviders() -> [ChatProviderType] {
+        return ChatProviderType.allCases.filter { hasAPIKey(for: $0) }
+    }
+    
     // MARK: - UserDefaults Keys
     private let selectedProviderKey = "selectedChatProvider"
     private let defaultProviderKey = "defaultChatProvider"
@@ -53,7 +70,7 @@ class ChatManager: ObservableObject {
     }
     
     func updateAvailableProviders() {
-        availableProviders = keychainManager.getAllStoredProviders()
+        availableProviders = getAllStoredProviders()
         
         // If current provider is not available, switch to first available or show setup
         if !availableProviders.contains(selectedProvider) {
@@ -242,7 +259,8 @@ class ChatManager: ObservableObject {
     // MARK: - API Key Management
     
     func storeAPIKey(_ key: String, for provider: ChatProviderType) -> Bool {
-        let success = keychainManager.storeAPIKey(key, for: provider)
+        guard let apiProvider = mapToAPIProvider(provider) else { return false }
+        let success = keychainManager.saveAPIKey(key, for: apiProvider)
         if success {
             updateAvailableProviders()
             
@@ -260,11 +278,13 @@ class ChatManager: ObservableObject {
     }
     
     func hasAPIKey(for provider: ChatProviderType) -> Bool {
-        return keychainManager.hasAPIKey(for: provider)
+        guard let apiProvider = mapToAPIProvider(provider) else { return false }
+        return keychainManager.getAPIKey(for: apiProvider) != nil
     }
     
     func deleteAPIKey(for provider: ChatProviderType) {
-        _ = keychainManager.deleteAPIKey(for: provider)
+        guard let apiProvider = mapToAPIProvider(provider) else { return }
+        _ = keychainManager.deleteAPIKey(for: apiProvider)
         updateAvailableProviders()
         
         // If we deleted the current provider's key, switch or show setup

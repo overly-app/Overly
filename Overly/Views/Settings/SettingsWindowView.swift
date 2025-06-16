@@ -25,6 +25,11 @@ struct SettingsWindowView: View {
                 }
                 .tag("Providers")
                 
+                NavigationLink(value: "API") {
+                    Label("API Keys", systemImage: "key")
+                }
+                .tag("API")
+                
                 NavigationLink(value: "Appearance") {
                     Label("Appearance", systemImage: "eye")
                 }
@@ -50,6 +55,8 @@ struct SettingsWindowView: View {
                     GeneralSettingsView()
                 case "Providers":
                     ProviderSettingsView()
+                case "API":
+                    APISettingsView()
                 case "Appearance":
                     AppearanceSettingsView()
                 case "Shortcuts":
