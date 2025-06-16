@@ -366,28 +366,43 @@ struct MessageBubble: View {
                     }
                 }
             } else {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 8) {
+                    // Header with just AI label
                     HStack {
                         Text("AI:")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.gray)
                         
                         Spacer()
-                        
-                        // Copy button for AI messages
-                        if isHovered {
+                    }
+                    
+                    // Message content
+                    MarkdownRenderer(content: message.content, textColor: .white)
+                        .textSelection(.enabled)
+                    
+                    // Copy button below the response
+                    if isHovered {
+                        HStack {
+                            Spacer()
                             Button(action: copyMessage) {
-                                Image(systemName: showCopyFeedback ? "checkmark" : "doc.on.doc")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(showCopyFeedback ? .green : .gray)
+                                HStack(spacing: 4) {
+                                    Image(systemName: showCopyFeedback ? "checkmark" : "doc.on.doc")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(showCopyFeedback ? .green : .gray)
+                                    
+                                    Text(showCopyFeedback ? "Copied!" : "Copy")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(showCopyFeedback ? .green : .gray)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.black.opacity(0.3))
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
                             }
                             .buttonStyle(.plain)
                             .help("Copy response")
                         }
                     }
-                    
-                    MarkdownRenderer(content: message.content, textColor: .white)
-                        .textSelection(.enabled)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 
@@ -496,7 +511,7 @@ struct MessageBubble: View {
     
     private var actionButtonsView: some View {
         HStack(spacing: 8) {
-            // Copy button
+            // Copy button for user messages
             Button(action: copyMessage) {
                 Image(systemName: showCopyFeedback ? "checkmark" : "doc.on.doc")
                     .font(.system(size: 12))

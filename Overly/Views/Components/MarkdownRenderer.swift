@@ -367,6 +367,25 @@ struct InlineTextParser {
         
         result = strikeRegex.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: "")
         
+        // Underline (<u>text</u>)
+        let underlinePattern = #"<u>([^<]+)</u>"#
+        let underlineRegex = try! NSRegularExpression(pattern: underlinePattern)
+        let underlineMatches = underlineRegex.matches(in: result, range: NSRange(result.startIndex..., in: result))
+        
+        for match in underlineMatches.reversed() {
+            let range = Range(match.range, in: result)!
+            let contentRange = Range(match.range(at: 1), in: result)!
+            let content = String(result[contentRange])
+            
+            elements.append(InlineTextElement(
+                type: .underline,
+                content: content,
+                range: range
+            ))
+        }
+        
+        result = underlineRegex.stringByReplacingMatches(in: result, range: NSRange(result.startIndex..., in: result), withTemplate: "")
+        
         return result
     }
 }
@@ -377,6 +396,7 @@ struct InlineTextElement {
         case bold
         case italic
         case strikethrough
+        case underline
         case inlineCode
         case link(url: String)
     }
@@ -606,6 +626,9 @@ struct MarkdownRenderer: View {
                 case .strikethrough:
                     attributedString[attributedRange].strikethroughStyle = .single
                     
+                case .underline:
+                    attributedString[attributedRange].underlineStyle = .single
+                    
                 case .inlineCode:
                     let monoFont = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
                     attributedString[attributedRange].font = monoFont
@@ -649,7 +672,7 @@ struct MarkdownRenderer: View {
 ## Heading 2
 ### Heading 3
 
-This is a **bold** text and this is *italic* text. You can also have ~~strikethrough~~ text.
+This is a **bold** text and this is *italic* text. You can also have ~~strikethrough~~ text and <u>underlined</u> text.
 
 Here's some `inline code` and a [link](https://example.com).
 
@@ -682,6 +705,13 @@ func hello() {
 > It can span multiple lines
 
 ---
+
+**Formatting Examples:**
+- **Bold text**
+- *Italic text*
+- <u>Underlined text</u>
+- ~~Strikethrough text~~
+- `Inline code`
 
 That's all!
 """)
