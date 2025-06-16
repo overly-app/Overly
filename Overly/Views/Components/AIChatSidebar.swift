@@ -14,12 +14,14 @@ class AIChatMessage: ObservableObject, Identifiable {
     let timestamp: Date = Date()
     @Published var responses: [String] = [] // For AI messages with multiple responses
     @Published var currentResponseIndex: Int = 0
+    @Published var isGenerating: Bool = false // Track if this message is currently being generated
     
     init(content: String, isUser: Bool) {
         self.content = content
         self.isUser = isUser
         if !isUser {
             self.responses = [content]
+            self.isGenerating = content.isEmpty // If content is empty, it's still generating
         }
     }
     
@@ -36,6 +38,7 @@ class AIChatMessage: ObservableObject, Identifiable {
             responses.removeAll()
             content = ""
             currentResponseIndex = 0
+            isGenerating = true
         }
     }
     
@@ -43,6 +46,18 @@ class AIChatMessage: ObservableObject, Identifiable {
         if !isUser && index >= 0 && index < responses.count {
             currentResponseIndex = index
             content = responses[index]
+        }
+    }
+    
+    func markGenerationComplete() {
+        if !isUser {
+            isGenerating = false
+        }
+    }
+    
+    func startGenerating() {
+        if !isUser {
+            isGenerating = true
         }
     }
 }
@@ -322,6 +337,7 @@ struct AIChatSidebar: View {
                 
                 // Create AI message and stream content
                 let aiMessage = AIChatMessage(content: "", isUser: false)
+                aiMessage.startGenerating() // Mark as generating
                 await MainActor.run {
                     messages.append(aiMessage)
                 }
@@ -349,6 +365,7 @@ struct AIChatSidebar: View {
                 
                 // Reset generation state when complete
                 await MainActor.run {
+                    aiMessage.markGenerationComplete() // Mark as complete
                     isGenerating = false
                     print("DEBUG: Set isGenerating = false (completed)")
                 }
@@ -425,6 +442,7 @@ struct AIChatSidebar: View {
                 
                 // Create AI message and stream content
                 let aiMessage = AIChatMessage(content: "", isUser: false)
+                aiMessage.startGenerating() // Mark as generating
                 await MainActor.run {
                     messages.append(aiMessage)
                 }
@@ -452,6 +470,7 @@ struct AIChatSidebar: View {
                 
                 // Reset generation state when complete
                 await MainActor.run {
+                    aiMessage.markGenerationComplete() // Mark as complete
                     isGenerating = false
                     print("DEBUG: Set isGenerating = false (edited message completed)")
                 }
@@ -484,6 +503,7 @@ struct AIChatSidebar: View {
         // Show typing indicator and set generating state
         isTyping = true
         isGenerating = true
+        message.startGenerating() // Mark this specific message as generating
         print("DEBUG: Set isGenerating = true (regenerating)")
         
         currentTask = Task {
@@ -524,6 +544,7 @@ struct AIChatSidebar: View {
                 
                 // Reset generation state when complete
                 await MainActor.run {
+                    message.markGenerationComplete() // Mark this specific message as complete
                     isGenerating = false
                     print("DEBUG: Set isGenerating = false (regeneration completed)")
                 }
@@ -619,30 +640,33 @@ struct MessageBubble: View {
                     MarkdownRenderer(content: message.content, textColor: .white)
                         .textSelection(.enabled)
                     
-                    // Copy button at the bottom - always visible
-                    HStack {
-                        // Regenerate button (only for AI messages)
-                        Button(action: {
-                            regenerateResponse(for: message)
-                        }) {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 12))
-                                .foregroundColor(.gray)
-                                .frame(width: 20, height: 20)
+                    // Action buttons at the bottom - only show when response is complete
+                    if !message.isGenerating {
+                        HStack {
+                            // Regenerate button (only for AI messages)
+                            Button(action: {
+                                regenerateResponse(for: message)
+                            }) {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.gray)
+                                    .frame(width: 20, height: 20)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Regenerate response")
+                            
+                            // Copy button next to regenerate
+                            Button(action: copyMessage) {
+                                Image(systemName: showCopyFeedback ? "checkmark" : "doc.on.doc")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(showCopyFeedback ? .green : .gray)
+                                    .frame(width: 20, height: 20)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Copy response")
+                            
+                            Spacer()
                         }
-                        .buttonStyle(.plain)
-                        .help("Regenerate response")
-                        
-                        Spacer()
-                        
-                        Button(action: copyMessage) {
-                            Image(systemName: showCopyFeedback ? "checkmark" : "doc.on.doc")
-                                .font(.system(size: 12))
-                                .foregroundColor(showCopyFeedback ? .green : .gray)
-                                .frame(width: 20, height: 20)
-                        }
-                        .buttonStyle(.plain)
-                        .help("Copy response")
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
