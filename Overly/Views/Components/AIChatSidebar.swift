@@ -332,11 +332,9 @@ struct AIChatSidebar: View {
     private func loadInitialMessages() {
         if ollamaManager.selectedModel.isEmpty {
             messages = [
-                AIChatMessage(content: "Hello! Please select an Ollama model to start chatting.", isUser: false)
             ]
         } else {
             messages = [
-                AIChatMessage(content: "Hello! I'm ready to help you. What would you like to know?", isUser: false)
             ]
         }
     }
