@@ -37,12 +37,21 @@ class ChatManager: ObservableObject {
             return .gemini
         case .groq:
             return .customOpenAI // Groq uses OpenAI-compatible API
+        case .ollama:
+            return .ollama
         }
     }
     
-    // Get all providers that have stored API keys
+    // Get all providers that have stored API keys OR don't require API keys
     private func getAllStoredProviders() -> [ChatProviderType] {
-        return ChatProviderType.allCases.filter { hasAPIKey(for: $0) }
+        return ChatProviderType.allCases.filter { provider in
+            if provider.requiresAPIKey {
+                return hasAPIKey(for: provider)
+            } else {
+                // For providers that don't require API keys (like Ollama), always include them
+                return true
+            }
+        }
     }
     
     // MARK: - UserDefaults Keys
@@ -278,6 +287,11 @@ class ChatManager: ObservableObject {
     }
     
     func hasAPIKey(for provider: ChatProviderType) -> Bool {
+        // If provider doesn't require an API key, return true
+        if !provider.requiresAPIKey {
+            return true
+        }
+        
         guard let apiProvider = mapToAPIProvider(provider) else { return false }
         return keychainManager.getAPIKey(for: apiProvider) != nil
     }

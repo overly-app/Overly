@@ -33,10 +33,11 @@ struct ChatMessage: Identifiable, Codable, Equatable {
 }
 
 // MARK: - Chat Provider Models
-enum ChatProviderType: String, CaseIterable, Identifiable {
+enum ChatProviderType: String, CaseIterable, Identifiable, Codable {
     case openai = "OpenAI"
     case gemini = "Gemini"
     case groq = "Groq"
+    case ollama = "Ollama"
     
     var id: String { rawValue }
     
@@ -45,6 +46,7 @@ enum ChatProviderType: String, CaseIterable, Identifiable {
         case .openai: return "OpenAI"
         case .gemini: return "Gemini"
         case .groq: return "Groq"
+        case .ollama: return "Ollama"
         }
     }
     
@@ -53,13 +55,14 @@ enum ChatProviderType: String, CaseIterable, Identifiable {
         case .openai: return "openai"
         case .gemini: return "gemini"
         case .groq: return "cpu"
+        case .ollama: return "server.rack"
         }
     }
     
     var isSystemIcon: Bool {
         switch self {
         case .openai, .gemini: return false
-        case .groq: return true
+        case .groq, .ollama: return true
         }
     }
     
@@ -68,6 +71,7 @@ enum ChatProviderType: String, CaseIterable, Identifiable {
         case .openai: return "https://api.openai.com/v1"
         case .gemini: return "https://generativelanguage.googleapis.com/v1beta"
         case .groq: return "https://api.groq.com/openai/v1"
+        case .ollama: return "http://localhost:11434"
         }
     }
     
@@ -76,6 +80,7 @@ enum ChatProviderType: String, CaseIterable, Identifiable {
         case .openai: return "gpt-4o"
         case .gemini: return "gemini-1.5-flash"
         case .groq: return "mixtral-8x7b-32768"
+        case .ollama: return "llama3.2"
         }
     }
     
@@ -88,6 +93,15 @@ enum ChatProviderType: String, CaseIterable, Identifiable {
             return ["gemini-1.5-flash", "gemini-1.5-pro"]
         case .groq:
             return ["mixtral-8x7b-32768", "llama-3.1-8b-instant"]
+        case .ollama:
+            return ["llama3.2", "llama3.1", "mistral"]
+        }
+    }
+    
+    var requiresAPIKey: Bool {
+        switch self {
+        case .openai, .gemini, .groq: return true
+        case .ollama: return false
         }
     }
 }

@@ -226,6 +226,19 @@ struct ChatProviderSettingsView: View {
             default:
                 return "High-speed inference model powered by Groq's LPU technology."
             }
+        case .ollama:
+            switch selectedModel {
+            case "llama3.2":
+                return "Meta's latest Llama model running locally via Ollama."
+            case "llama3.1":
+                return "Previous version of Meta's Llama model with strong performance."
+            case "codellama":
+                return "Specialized model for code generation and programming tasks."
+            case "mistral":
+                return "Efficient open-source model with good reasoning capabilities."
+            default:
+                return "Local AI model running through Ollama server."
+            }
         }
     }
     

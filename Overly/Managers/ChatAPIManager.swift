@@ -23,6 +23,8 @@ class ChatAPIManager: ObservableObject {
             return .gemini
         case .groq:
             return .customOpenAI // Groq uses OpenAI-compatible API
+        case .ollama:
+            return .ollama
         }
     }
     
@@ -38,29 +40,49 @@ class ChatAPIManager: ObservableObject {
         temperature: Double = 0.7
     ) async throws -> String {
         
-        guard let apiProvider = mapToAPIProvider(provider),
-              let apiKey = keychainManager.getAPIKey(for: apiProvider) else {
-            throw ChatError.invalidAPIKey
-        }
-        
         switch provider {
-        case .openai, .groq:
-            return try await sendOpenAICompatibleMessage(
-                message,
-                provider: provider,
-                model: model,
-                apiKey: apiKey,
-                conversationHistory: conversationHistory,
-                temperature: temperature
-            )
-        case .gemini:
-            return try await sendGeminiMessage(
-                message,
-                model: model,
-                apiKey: apiKey,
-                conversationHistory: conversationHistory,
-                temperature: temperature
-            )
+        case .ollama:
+            // Use OllamaManager for Ollama
+            let ollamaManager = OllamaManager.shared
+            let ollamaMessages = [OllamaChatMessage(role: "user", content: message)]
+            
+            var fullResponse = ""
+            let stream = try await ollamaManager.sendChatMessage(messages: ollamaMessages, model: model)
+            
+            for try await chunk in stream {
+                fullResponse += chunk
+            }
+            
+            return fullResponse
+            
+        case .openai, .gemini, .groq:
+            guard let apiProvider = mapToAPIProvider(provider),
+                  let apiKey = keychainManager.getAPIKey(for: apiProvider) else {
+                throw ChatError.invalidAPIKey
+            }
+            
+            switch provider {
+            case .openai, .groq:
+                return try await sendOpenAICompatibleMessage(
+                    message,
+                    provider: provider,
+                    model: model,
+                    apiKey: apiKey,
+                    conversationHistory: conversationHistory,
+                    temperature: temperature
+                )
+            case .gemini:
+                return try await sendGeminiMessage(
+                    message,
+                    model: model,
+                    apiKey: apiKey,
+                    conversationHistory: conversationHistory,
+                    temperature: temperature
+                )
+            case .ollama:
+                // This case is handled above, but included for completeness
+                return ""
+            }
         }
     }
     
@@ -78,33 +100,52 @@ class ChatAPIManager: ObservableObject {
     ) {
         Task {
             do {
-                guard let apiProvider = mapToAPIProvider(provider),
-                      let apiKey = keychainManager.getAPIKey(for: apiProvider) else {
-                    throw ChatError.invalidAPIKey
-                }
-                
                 switch provider {
-                case .openai, .groq:
-                    try await sendOpenAICompatibleMessageStream(
-                        message,
-                        provider: provider,
-                        model: model,
-                        apiKey: apiKey,
-                        conversationHistory: conversationHistory,
-                        temperature: temperature,
-                        onChunk: onChunk,
-                        onComplete: onComplete
-                    )
-                case .gemini:
-                    try await sendGeminiMessageStream(
-                        message,
-                        model: model,
-                        apiKey: apiKey,
-                        conversationHistory: conversationHistory,
-                        temperature: temperature,
-                        onChunk: onChunk,
-                        onComplete: onComplete
-                    )
+                case .ollama:
+                    // Use OllamaManager for streaming
+                    let ollamaManager = OllamaManager.shared
+                    let ollamaMessages = [OllamaChatMessage(role: "user", content: message)]
+                    
+                    let stream = try await ollamaManager.sendChatMessage(messages: ollamaMessages, model: model)
+                    
+                    for try await chunk in stream {
+                        onChunk(chunk)
+                    }
+                    
+                    onComplete()
+                    
+                case .openai, .gemini, .groq:
+                    guard let apiProvider = mapToAPIProvider(provider),
+                          let apiKey = keychainManager.getAPIKey(for: apiProvider) else {
+                        throw ChatError.invalidAPIKey
+                    }
+                    
+                    switch provider {
+                    case .openai, .groq:
+                        try await sendOpenAICompatibleMessageStream(
+                            message,
+                            provider: provider,
+                            model: model,
+                            apiKey: apiKey,
+                            conversationHistory: conversationHistory,
+                            temperature: temperature,
+                            onChunk: onChunk,
+                            onComplete: onComplete
+                        )
+                    case .gemini:
+                        try await sendGeminiMessageStream(
+                            message,
+                            model: model,
+                            apiKey: apiKey,
+                            conversationHistory: conversationHistory,
+                            temperature: temperature,
+                            onChunk: onChunk,
+                            onComplete: onComplete
+                        )
+                    case .ollama:
+                        // This case is handled above, but included for completeness
+                        break
+                    }
                 }
             } catch {
                 onError(error)
@@ -419,23 +460,32 @@ class ChatAPIManager: ObservableObject {
         }
     }
     
-    // MARK: - Utility Methods
-    
     // MARK: - Model Fetching
     
     func fetchAvailableModels(for provider: ChatProviderType) async throws -> [String] {
-        guard let apiProvider = mapToAPIProvider(provider),
-              let apiKey = keychainManager.getAPIKey(for: apiProvider) else {
-            throw ChatError.invalidAPIKey
-        }
-        
         switch provider {
-        case .openai:
-            return try await fetchOpenAIModels(apiKey: apiKey)
-        case .gemini:
-            return try await fetchGeminiModels(apiKey: apiKey)
-        case .groq:
-            return try await fetchGroqModels(apiKey: apiKey)
+        case .ollama:
+            // Use OllamaManager for Ollama models
+            let ollamaManager = OllamaManager.shared
+            await ollamaManager.fetchModels()
+            return ollamaManager.availableModels.map { $0.name }
+        case .openai, .gemini, .groq:
+            guard let apiProvider = mapToAPIProvider(provider),
+                  let apiKey = keychainManager.getAPIKey(for: apiProvider) else {
+                throw ChatError.invalidAPIKey
+            }
+            
+            switch provider {
+            case .openai:
+                return try await fetchOpenAIModels(apiKey: apiKey)
+            case .gemini:
+                return try await fetchGeminiModels(apiKey: apiKey)
+            case .groq:
+                return try await fetchGroqModels(apiKey: apiKey)
+            case .ollama:
+                // This case is handled above, but included for completeness
+                return []
+            }
         }
     }
     

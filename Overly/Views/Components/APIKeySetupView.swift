@@ -17,6 +17,7 @@ struct APIKeySetupView: View {
     @State private var validationResult: ValidationResult?
     @State private var showingDeleteConfirmation: Bool = false
     @State private var providerToDelete: ChatProviderType?
+    @State private var showingModelManagement: Bool = false
     
     enum ValidationResult {
         case success
@@ -68,6 +69,9 @@ struct APIKeySetupView: View {
             if let provider = providerToDelete {
                 Text("Are you sure you want to delete the API key for \(provider.displayName)?")
             }
+        }
+        .sheet(isPresented: $showingModelManagement) {
+            ModelManagementView()
         }
     }
     
@@ -172,13 +176,13 @@ struct APIKeySetupView: View {
     private var apiKeyInputView: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("\(selectedProvider.displayName) API Key")
+                Text("\(selectedProvider.displayName) \(selectedProvider.requiresAPIKey ? "API Key" : "Configuration")")
                     .font(.headline)
                     .foregroundColor(.primary)
                 
                 Spacer()
                 
-                if chatManager.hasAPIKey(for: selectedProvider) {
+                if chatManager.hasAPIKey(for: selectedProvider) && selectedProvider.requiresAPIKey {
                     Button("Delete") {
                         providerToDelete = selectedProvider
                         showingDeleteConfirmation = true
@@ -188,55 +192,97 @@ struct APIKeySetupView: View {
                 }
             }
             
-            // API Key input field
-            VStack(spacing: 8) {
-                HStack {
-                    Group {
-                        if isSecureEntry {
-                            SecureField("Enter your API key", text: $apiKey)
-                        } else {
-                            TextField("Enter your API key", text: $apiKey)
+            if selectedProvider.requiresAPIKey {
+                // API Key input field for providers that need it
+                VStack(spacing: 8) {
+                    HStack {
+                        Group {
+                            if isSecureEntry {
+                                SecureField("Enter your API key", text: $apiKey)
+                            } else {
+                                TextField("Enter your API key", text: $apiKey)
+                            }
                         }
+                        .textFieldStyle(.plain)
+                        .font(.system(.body, design: .monospaced))
+                        .disabled(isValidating)
+                        
+                        Button(action: { isSecureEntry.toggle() }) {
+                            Image(systemName: isSecureEntry ? "eye" : "eye.slash")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .textFieldStyle(.plain)
-                    .font(.system(.body, design: .monospaced))
-                    .disabled(isValidating)
+                    .padding(12)
+                    .background(Color(NSColor.textBackgroundColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(inputBorderColor, lineWidth: 1)
+                    )
                     
-                    Button(action: { isSecureEntry.toggle() }) {
-                        Image(systemName: isSecureEntry ? "eye" : "eye.slash")
-                            .foregroundColor(.secondary)
+                    // Validation result
+                    if let result = validationResult {
+                        validationResultView(result)
                     }
-                    .buttonStyle(.plain)
                 }
-                .padding(12)
-                .background(Color(NSColor.textBackgroundColor))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(inputBorderColor, lineWidth: 1)
-                )
                 
-                // Validation result
-                if let result = validationResult {
-                    validationResultView(result)
+                // Action buttons
+                HStack(spacing: 12) {
+                    Button("Test Key") {
+                        testAPIKey()
+                    }
+                    .disabled(apiKey.isEmpty || isValidating)
+                    
+                    Button("Save Key") {
+                        saveAPIKey()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(apiKey.isEmpty || isValidating)
+                    
+                    if isValidating {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    }
                 }
-            }
-            
-            // Action buttons
-            HStack(spacing: 12) {
-                Button("Test Key") {
-                    testAPIKey()
-                }
-                .disabled(apiKey.isEmpty || isValidating)
-                
-                Button("Save Key") {
-                    saveAPIKey()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(apiKey.isEmpty || isValidating)
-                
-                if isValidating {
-                    ProgressView()
-                        .scaleEffect(0.8)
+            } else {
+                // Special handling for providers that don't need API keys (like Ollama)
+                VStack(spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        
+                        Text("\(selectedProvider.displayName) doesn't require an API key")
+                            .font(.body)
+                            .foregroundColor(.primary)
+                        
+                        Spacer()
+                    }
+                    .padding(12)
+                    .background(Color.green.opacity(0.1))
+                    .cornerRadius(8)
+                    
+                    if selectedProvider == .ollama {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Make sure Ollama is running locally:")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            
+                            Text("• Install Ollama from ollama.ai")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Text("• Run 'ollama serve' in terminal")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Text("• Pull models with 'ollama pull llama3.2'")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(12)
+                        .background(Color(NSColor.controlBackgroundColor))
+                        .cornerRadius(8)
+                    }
                 }
             }
         }
@@ -360,13 +406,19 @@ struct APIKeySetupView: View {
                 instructionRow(
                     provider: .gemini,
                     instruction: "Visit makersuite.google.com → Get API Key → Create API key",
-                    url: "https://makersuite.google.com/app/apikey"
+                    url: "https://aistudio.google.com/"
                 )
                 
                 instructionRow(
                     provider: .groq,
                     instruction: "Visit console.groq.com → API Keys → Create API Key",
                     url: "https://console.groq.com/keys"
+                )
+                
+                instructionRow(
+                    provider: .ollama,
+                    instruction: "Install Ollama locally and run 'ollama serve' to start the server",
+                    url: "https://ollama.com"
                 )
             }
         }
@@ -418,10 +470,17 @@ struct APIKeySetupView: View {
             
             Spacer()
             
-            Button("Done") {
-                dismiss()
+            HStack(spacing: 12) {
+                Button("Manage Models") {
+                    showingModelManagement = true
+                }
+                .buttonStyle(.bordered)
+                
+                Button("Done") {
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
             }
-            .buttonStyle(.borderedProminent)
         }
         .padding(24)
         .background(
@@ -432,10 +491,14 @@ struct APIKeySetupView: View {
     // MARK: - Actions
     
     private func loadExistingKey() {
-        if chatManager.hasAPIKey(for: selectedProvider) {
-            apiKey = "••••••••••••••••" // Show masked key
+        if selectedProvider.requiresAPIKey {
+            if chatManager.hasAPIKey(for: selectedProvider) {
+                apiKey = "••••••••••••••••" // Show masked key
+            } else {
+                apiKey = ""
+            }
         } else {
-            apiKey = ""
+            apiKey = "" // No API key needed
         }
         validationResult = nil
     }
