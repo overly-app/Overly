@@ -32,6 +32,7 @@ struct AIChatProviderView: View {
         .background(Color(red: 0.11, green: 0.11, blue: 0.11))
         .onAppear {
             loadPersistedMessages()
+            setupNotificationObservers()
         }
         .onDisappear {
             saveMessagesToPersistence()
@@ -534,6 +535,51 @@ struct AIChatProviderView: View {
                     messages.append(errorMessage)
                     // Save messages after error
                     saveMessagesToPersistence()
+                }
+            }
+        }
+    }
+    
+    private func setupNotificationObservers() {
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SendOllamaMessage"),
+            object: nil,
+            queue: .main
+        ) { notification in
+            if let userInfo = notification.userInfo,
+               let model = userInfo["model"] as? String,
+               let query = userInfo["query"] as? String {
+                
+                // Set the model if provided and not empty
+                if !model.isEmpty {
+                    Task { @MainActor in
+                        // Try to find an exact match first
+                        let availableModels = providerManager.availableModels.filter { $0.provider == .ollama && $0.isEnabled }
+                        
+                        if let exactMatch = availableModels.first(where: { $0.name == model }) {
+                            providerManager.setSelectedModel(exactMatch.name)
+                        } else {
+                            // Try fuzzy matching for partial names (e.g., "llama3.2" should match "llama3.2:1b")
+                            if let fuzzyMatch = availableModels.first(where: { $0.name.hasPrefix(model) }) {
+                                providerManager.setSelectedModel(fuzzyMatch.name)
+                            } else {
+                                // Try even more flexible matching (case insensitive, contains)
+                                if let flexibleMatch = availableModels.first(where: { 
+                                    $0.name.lowercased().contains(model.lowercased()) 
+                                }) {
+                                    providerManager.setSelectedModel(flexibleMatch.name)
+                                }
+                                // If no match found, just use the provided model name as-is
+                                // (in case it's a valid model that's not in the current list)
+                            }
+                        }
+                    }
+                }
+                
+                // Set the input text and send the message if query is provided
+                if !query.isEmpty {
+                    inputText = query
+                    sendMessage()
                 }
             }
         }

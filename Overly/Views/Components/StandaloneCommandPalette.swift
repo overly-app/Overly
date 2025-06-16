@@ -17,6 +17,7 @@ struct StandaloneCommandPalette: View {
     @StateObject private var commandHistory = CommandHistory.shared
     let onNavigate: (URL) -> Void
     @ObservedObject var settings = AppSettings.shared
+    @StateObject private var aiProviderManager = AIProviderManager.shared
     
     // Use the command navigation handler
     private var navigationHandler: CommandNavigationHandler {
@@ -47,6 +48,41 @@ struct StandaloneCommandPalette: View {
         return availableCommands.filter { cmd in
             cmd.command.lowercased() == commandPart.lowercased()
         }
+    }
+    
+    // Model suggestions for /ollama command
+    private var modelSuggestions: [String] {
+        let trimmedCommand = command.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = trimmedCommand.split(separator: " ")
+        
+        // Only show model suggestions for /ollama command
+        guard parts.count >= 1 && parts[0].lowercased() == "/ollama" else {
+            return []
+        }
+        
+        let availableModels = aiProviderManager.availableModels
+            .filter { $0.provider == .ollama && $0.isEnabled }
+            .map { $0.name }
+        
+        // If we have parts, check if the last part looks like a partial model name
+        if parts.count >= 2 {
+            let lastPart = String(parts.last!).lowercased()
+            // Only show suggestions if the last part looks like it could be a model name
+            if lastPart.contains(".") || lastPart.contains(":") || 
+               lastPart.range(of: "^[a-zA-Z0-9]+[0-9]", options: .regularExpression) != nil ||
+               availableModels.contains(where: { $0.lowercased().hasPrefix(lastPart) }) {
+                return availableModels.filter { $0.lowercased().hasPrefix(lastPart) }
+            }
+        }
+        
+        return availableModels
+    }
+    
+    // Check if we should show model suggestions
+    private var shouldShowModelSuggestions: Bool {
+        let trimmedCommand = command.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = trimmedCommand.split(separator: " ")
+        return parts.count >= 1 && parts[0].lowercased() == "/ollama" && !modelSuggestions.isEmpty
     }
     
     private var currentQuery: String {
@@ -103,6 +139,8 @@ struct StandaloneCommandPalette: View {
             // Command hints and autocomplete or history
             if shouldShowHistory && !commandHistory.history.isEmpty {
                 buildHistoryView()
+            } else if shouldShowModelSuggestions {
+                buildModelSuggestionsView()
             } else if !filteredCommands.isEmpty {
                 buildAutocompleteView()
             }
@@ -214,6 +252,56 @@ struct StandaloneCommandPalette: View {
         .padding(.top, 3)
     }
     
+    private func buildModelSuggestionsView() -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Available Models")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            
+            ForEach(Array(modelSuggestions.enumerated()), id: \.element) { index, model in
+                let displayText = getDisplayText(for: model)
+                
+                HStack {
+                    Text(displayText)
+                        .font(.system(size: 13, design: .monospaced))
+                        .foregroundColor(index == selectedIndex ? .white : .primary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(index == selectedIndex ? Color.accentColor : Color.clear)
+                        .cornerRadius(5)
+                    
+                    Spacer()
+                    
+                    if index == selectedIndex {
+                        Text("TAB")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.secondary.opacity(0.2))
+                            .cornerRadius(3)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 2)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    selectModel(model)
+                }
+            }
+        }
+        .padding(.vertical, 8)
+        .background(.regularMaterial)
+        .cornerRadius(10)
+        .padding(.top, 3)
+    }
+    
     private func setupCommandPalette() {
         selectedIndex = 0
         historyIndex = -1
@@ -250,6 +338,10 @@ struct StandaloneCommandPalette: View {
             } else {
                 historyIndex = max(0, historyIndex - 1)
             }
+        } else if shouldShowModelSuggestions {
+            // Navigate through model suggestions
+            isInHistoryMode = false
+            selectedIndex = max(0, selectedIndex - 1)
         } else if !filteredCommands.isEmpty {
             // Navigate through autocomplete
             isInHistoryMode = false
@@ -266,6 +358,10 @@ struct StandaloneCommandPalette: View {
             } else {
                 historyIndex = min(commandHistory.history.count - 1, historyIndex + 1)
             }
+        } else if shouldShowModelSuggestions {
+            // Navigate through model suggestions
+            isInHistoryMode = false
+            selectedIndex = min(modelSuggestions.count - 1, selectedIndex + 1)
         } else if !filteredCommands.isEmpty {
             // Navigate through autocomplete
             isInHistoryMode = false
@@ -282,6 +378,13 @@ struct StandaloneCommandPalette: View {
             return
         }
         
+        if shouldShowModelSuggestions && selectedIndex < modelSuggestions.count {
+            // Select model for /ollama command
+            let selectedModel = modelSuggestions[selectedIndex]
+            selectModel(selectedModel)
+            return
+        }
+        
         guard selectedIndex < filteredCommands.count else { return }
         let selectedCommand = filteredCommands[selectedIndex]
         
@@ -290,6 +393,61 @@ struct StandaloneCommandPalette: View {
         if trimmedCommand.isEmpty || trimmedCommand == "/" || !trimmedCommand.contains(" ") {
             command = selectedCommand.command + " "
         }
+    }
+    
+    private func getDisplayText(for model: String) -> String {
+        let trimmedCommand = command.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = trimmedCommand.split(separator: " ")
+        
+        if parts.count >= 2 {
+            let lastPart = String(parts.last!)
+            if lastPart.contains(".") || lastPart.contains(":") || 
+               lastPart.range(of: "^[a-zA-Z0-9]+[0-9]", options: .regularExpression) != nil ||
+               aiProviderManager.availableModels.contains(where: { $0.name.lowercased().hasPrefix(lastPart.lowercased()) }) {
+                // Replace the partial model with the full model name
+                let queryParts = parts.dropLast()
+                if queryParts.isEmpty {
+                    return "/ollama \(model)"
+                } else {
+                    return "/ollama \(queryParts.joined(separator: " ")) \(model)"
+                }
+            } else {
+                // Append model to existing query
+                return "\(trimmedCommand) \(model)"
+            }
+        } else {
+            return "/ollama \(model)"
+        }
+    }
+    
+    private func selectModel(_ model: String) {
+        let trimmedCommand = command.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = trimmedCommand.split(separator: " ")
+        
+        if parts.count >= 2 {
+            // Check if the last part looks like a partial model name
+            let lastPart = String(parts.last!)
+            if lastPart.contains(".") || lastPart.contains(":") || 
+               lastPart.range(of: "^[a-zA-Z0-9]+[0-9]", options: .regularExpression) != nil ||
+               aiProviderManager.availableModels.contains(where: { $0.name.lowercased().hasPrefix(lastPart.lowercased()) }) {
+                // Replace the last part (partial model) with the selected model
+                let queryParts = parts.dropLast()
+                if queryParts.isEmpty {
+                    command = "/ollama \(model) "
+                } else {
+                    command = "/ollama \(queryParts.joined(separator: " ")) \(model) "
+                }
+            } else {
+                // Append the model to the end
+                command = "\(trimmedCommand) \(model) "
+            }
+        } else {
+            // Just add the model
+            command = "/ollama \(model) "
+        }
+        
+        // Reset selection
+        selectedIndex = 0
     }
     
     private func hideCommandPalette() {
@@ -322,7 +480,11 @@ struct StandaloneCommandPalette: View {
         commandHistory.addCommand(trimmedCommand)
         
         navigationHandler.executeCommand(trimmedCommand)
-        hideCommandPalette()
+        
+        // Add a small delay before hiding the palette to allow notifications to be processed
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            hideCommandPalette()
+        }
     }
 }
 

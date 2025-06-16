@@ -17,7 +17,8 @@ struct CommandNavigationHandler {
         CommandInfo(command: "/chat", description: "Open ChatGPT with query", placeholder: "Type your question...", serviceId: "ChatGPT"),
         CommandInfo(command: "/claude", description: "Open Claude with query", placeholder: "Type your question...", serviceId: "Claude"),
         CommandInfo(command: "/perplexity", description: "Open Perplexity with query", placeholder: "Type your question...", serviceId: "Perplexity"),
-        CommandInfo(command: "/copilot", description: "Open Copilot with query", placeholder: "Type your question...", serviceId: "Copilot")
+        CommandInfo(command: "/copilot", description: "Open Copilot with query", placeholder: "Type your question...", serviceId: "Copilot"),
+        CommandInfo(command: "/ollama", description: "Chat with Ollama model", placeholder: "query [model]", serviceId: "AI Chat")
     ]
     
     func executeCommand(_ command: String) {
@@ -48,6 +49,11 @@ struct CommandNavigationHandler {
             navigateToCopilot(with: query)
         } else if trimmedCommand == "/copilot" {
             navigateToCopilot(with: "")
+        } else if trimmedCommand.hasPrefix("/ollama ") {
+            let args = String(trimmedCommand.dropFirst(8))
+            navigateToOllama(with: args)
+        } else if trimmedCommand == "/ollama" {
+            navigateToOllama(with: "")
         }
     }
     
@@ -119,5 +125,38 @@ struct CommandNavigationHandler {
         if let url = URL(string: urlString) {
             onNavigate(url)
         }
+    }
+    
+    private func navigateToOllama(with args: String) {
+        // Parse arguments: query with optional model at the end
+        let trimmedArgs = args.trimmingCharacters(in: .whitespacesAndNewlines)
+        var model = ""
+        var query = trimmedArgs
+        
+        if !trimmedArgs.isEmpty {
+            // Check if the last word looks like a model name (contains letters and numbers, possibly with dots/colons)
+            let words = trimmedArgs.split(separator: " ")
+            if let lastWord = words.last {
+                let lastWordStr = String(lastWord)
+                // Check if it looks like a model name (alphanumeric with dots/colons, not just a regular word)
+                if lastWordStr.contains(":") || lastWordStr.contains(".") || 
+                   (lastWordStr.range(of: "^[a-zA-Z0-9]+[0-9]", options: .regularExpression) != nil) {
+                    model = lastWordStr
+                    // Remove the model from the query
+                    if words.count > 1 {
+                        query = words.dropLast().joined(separator: " ")
+                    } else {
+                        query = ""
+                    }
+                }
+            }
+        }
+        
+        // Post notification to switch to AI Chat provider and send message
+        NotificationCenter.default.post(
+            name: NSNotification.Name("SwitchToAIChat"),
+            object: nil,
+            userInfo: ["model": model, "query": query]
+        )
     }
 } 

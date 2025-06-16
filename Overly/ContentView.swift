@@ -61,6 +61,7 @@ struct ContentView: View {
                     setupWindow()
                     initializeSelectedProvider()
                     fetchFaviconsForActiveProviders()
+                    setupNotificationObservers()
                 }
                 
                 // Command palette overlay (only for WebView mode)
@@ -135,6 +136,31 @@ struct ContentView: View {
         showCommandPalette = true
     }
     
+    private func setupNotificationObservers() {
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SwitchToAIChat"),
+            object: nil,
+            queue: .main
+        ) { notification in
+            // Switch to AI Chat provider
+            if let aiChatProvider = settings.allBuiltInProviders.first(where: { $0.id == "AI Chat" }) {
+                selectedProvider = aiChatProvider
+                
+                // Send the model and query info to the AI Chat view
+                if let userInfo = notification.userInfo,
+                   let model = userInfo["model"] as? String,
+                   let query = userInfo["query"] as? String {
+                    
+                    // Post another notification for the AI Chat view to handle
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("SendOllamaMessage"),
+                        object: nil,
+                        userInfo: ["model": model, "query": query]
+                    )
+                }
+            }
+        }
+    }
 
 }
 
