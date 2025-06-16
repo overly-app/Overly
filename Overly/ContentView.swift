@@ -18,6 +18,7 @@ struct ContentView: View {
     @State private var showCommandPalette: Bool = false
     @State private var showAISidebar: Bool = false
     @AppStorage("useNativeChat") var useNativeChat: Bool = false
+    @StateObject private var sidebarManager = AIChatSidebarManager.shared
 
     var body: some View {
         if hasCompletedOnboarding {
@@ -152,9 +153,8 @@ struct ContentView: View {
         if let window = window as? BorderlessWindow {
             window.toggleSidebarAction = { [self] in
                 DispatchQueue.main.async {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        self.showAISidebar.toggle()
-                    }
+                    // Use the shared manager to handle the toggle
+                    self.sidebarManager.handleToggleShortcut(sidebarVisibility: self.$showAISidebar)
                 }
             }
         }

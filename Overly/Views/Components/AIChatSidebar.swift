@@ -7,6 +7,47 @@
 
 import SwiftUI
 
+// Shared state manager for AI Chat Sidebar
+class AIChatSidebarManager: ObservableObject {
+    static let shared = AIChatSidebarManager()
+    
+    @Published var displayMode: ChatDisplayMode = .sidebar
+    @Published var floatingWindow: NSWindow?
+    @Published var windowDelegate: FloatingWindowDelegate?
+    
+    private init() {}
+    
+    enum ChatDisplayMode: String, CaseIterable {
+        case sidebar = "Sidebar"
+        case floating = "Floating"
+        
+        var icon: String {
+            switch self {
+            case .sidebar: return "sidebar.left"
+            case .floating: return "macwindow"
+            }
+        }
+    }
+    
+    // Method to handle Cmd+E shortcut based on current display mode
+    func handleToggleShortcut(sidebarVisibility: Binding<Bool>) {
+        switch displayMode {
+        case .sidebar:
+            // Toggle sidebar visibility
+            withAnimation(.easeInOut(duration: 0.15)) {
+                sidebarVisibility.wrappedValue.toggle()
+            }
+        case .floating:
+            // Focus the floating window if it exists
+            if let window = floatingWindow {
+                window.makeKeyAndOrderFront(nil)
+                window.orderFrontRegardless()
+                NSApp.activate(ignoringOtherApps: true)
+            }
+        }
+    }
+}
+
 // Struct for persisting messages to UserDefaults
 struct PersistedMessage: Codable {
     let content: String
@@ -88,6 +129,7 @@ struct AIChatSidebar: View {
     @StateObject private var textSelectionManager = TextSelectionManager.shared
     @StateObject private var ollamaManager = OllamaManager.shared
     @State private var showModelPicker = false
+    @StateObject private var sidebarManager = AIChatSidebarManager.shared
     
     var body: some View {
         VStack(spacing: 0) {
@@ -139,6 +181,45 @@ struct AIChatSidebar: View {
                 }
                 .buttonStyle(.plain)
                 .help("Start new chat")
+                
+                // Display mode dropdown
+                Menu {
+                    ForEach(AIChatSidebarManager.ChatDisplayMode.allCases, id: \.self) { mode in
+                        Button(action: {
+                            switchDisplayMode(to: mode)
+                        }) {
+                            HStack {
+                                Image(systemName: mode.icon)
+                                Text(mode.rawValue)
+                                if sidebarManager.displayMode == mode {
+                                    Spacer()
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: sidebarManager.displayMode.icon)
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                        
+                        Text(sidebarManager.displayMode.rawValue)
+                            .font(.system(size: 12))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                        
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10))
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+                .help("Change display mode")
                 
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.15)) {
@@ -646,6 +727,119 @@ struct AIChatSidebar: View {
                 }
             }
         }
+    }
+    
+    private func switchDisplayMode(to mode: AIChatSidebarManager.ChatDisplayMode) {
+        // Prevent rapid switching
+        guard sidebarManager.displayMode != mode else { return }
+        
+        sidebarManager.displayMode = mode
+        
+        switch mode {
+        case .sidebar:
+            // Close floating window if it exists
+            if let window = sidebarManager.floatingWindow {
+                window.delegate = nil // Clear delegate first
+                window.close()
+            }
+            sidebarManager.floatingWindow = nil
+            sidebarManager.windowDelegate = nil // Clear delegate reference
+            // Show sidebar
+            isVisible = true
+            
+        case .floating:
+            // Hide sidebar
+            isVisible = false
+            // Create floating window
+            createFloatingWindow()
+        }
+    }
+    
+    private func createFloatingWindow() {
+        // Close existing window if any
+        sidebarManager.floatingWindow?.close()
+        
+        // Create new floating window with custom properties
+        let window = NSWindow(
+            contentRect: NSRect(x: 100, y: 100, width: 400, height: 600),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        
+        window.title = "AI Assistant"
+        window.isReleasedWhenClosed = false
+        window.center()
+        
+        // Set window level to float above other windows including borderless ones
+        window.level = .floating
+        
+        // Make it stay on top and visible
+        window.hidesOnDeactivate = false
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        
+        // Set appearance
+        window.titlebarAppearsTransparent = false
+        window.backgroundColor = NSColor(red: 0.11, green: 0.11, blue: 0.11, alpha: 1.0)
+        
+        // Create the floating chat view
+        let floatingChatView = FloatingChatView(
+            messages: $messages,
+            inputText: $inputText,
+            isTyping: $isTyping,
+            isGenerating: $isGenerating,
+            currentTask: $currentTask,
+            textSelectionManager: textSelectionManager,
+            ollamaManager: ollamaManager,
+            showModelPicker: $showModelPicker,
+            onSwitchToSidebar: {
+                // Use DispatchQueue.main.async to safely update state
+                DispatchQueue.main.async {
+                    self.switchDisplayMode(to: .sidebar)
+                }
+            },
+            onStartNewChat: {
+                startNewChat()
+            },
+            onSaveMessages: {
+                saveMessagesToPersistence()
+            },
+            onGenerateResponseForEditedMessage: {
+                generateResponseForEditedMessage()
+            },
+            onRegenerateResponse: { message in
+                regenerateResponse(for: message)
+            },
+            onSendMessage: {
+                sendMessage()
+            },
+            onStopGeneration: {
+                stopGeneration()
+            }
+        )
+        
+        window.contentView = NSHostingView(rootView: floatingChatView)
+        window.makeKeyAndOrderFront(nil)
+        
+        // Ensure it's visible and focused
+        window.orderFrontRegardless()
+        NSApp.activate(ignoringOtherApps: true)
+        
+        // Store reference in the shared manager
+        sidebarManager.floatingWindow = window
+        
+        // Handle window closing with safer callback
+        let delegate = FloatingWindowDelegate {
+            // Use DispatchQueue.main.async to safely update state
+            DispatchQueue.main.async {
+                self.sidebarManager.displayMode = .sidebar
+                self.sidebarManager.floatingWindow = nil
+                self.sidebarManager.windowDelegate = nil
+                self.isVisible = true
+            }
+        }
+        window.delegate = delegate
+        sidebarManager.windowDelegate = delegate // Store strong reference
     }
 }
 
@@ -1180,6 +1374,207 @@ struct ModelRow: View {
             .clipShape(RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(.plain)
+    }
+}
+
+// Floating window delegate to handle window events
+class FloatingWindowDelegate: NSObject, NSWindowDelegate {
+    private let onClose: () -> Void
+    
+    init(onClose: @escaping () -> Void) {
+        self.onClose = onClose
+        super.init()
+    }
+    
+    func windowWillClose(_ notification: Notification) {
+        onClose()
+    }
+}
+
+// Floating chat view without headers
+struct FloatingChatView: View {
+    @Binding var messages: [AIChatMessage]
+    @Binding var inputText: String
+    @Binding var isTyping: Bool
+    @Binding var isGenerating: Bool
+    @Binding var currentTask: Task<Void, Never>?
+    @ObservedObject var textSelectionManager: TextSelectionManager
+    @ObservedObject var ollamaManager: OllamaManager
+    @Binding var showModelPicker: Bool
+    @FocusState private var isInputFocused: Bool
+    
+    let onSwitchToSidebar: () -> Void
+    let onStartNewChat: () -> Void
+    let onSaveMessages: () -> Void
+    let onGenerateResponseForEditedMessage: () -> Void
+    let onRegenerateResponse: (AIChatMessage) -> Void
+    let onSendMessage: () -> Void
+    let onStopGeneration: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Minimal header with just controls
+            HStack {
+                // Model picker
+                Button(action: {
+                    showModelPicker.toggle()
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "brain")
+                            .font(.system(size: 12))
+                            .foregroundColor(.gray)
+                        
+                        Text(ollamaManager.selectedModel.isEmpty ? "Select Model" : ollamaManager.selectedModel.replacingOccurrences(of: ":latest", with: ""))
+                            .font(.system(size: 12))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                        
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 10))
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showModelPicker) {
+                    ModelPickerView()
+                }
+                
+                Spacer()
+                
+                // New chat button
+                Button(action: onStartNewChat) {
+                    Image(systemName: "plus.message")
+                        .foregroundColor(.gray)
+                        .font(.system(size: 14, weight: .medium))
+                        .frame(width: 28, height: 28)
+                        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+                .help("Start new chat")
+                
+                // Switch to sidebar button
+                Button(action: {
+                    // Add safety check to prevent multiple rapid calls
+                    onSwitchToSidebar()
+                }) {
+                    Image(systemName: "sidebar.left")
+                        .foregroundColor(.gray)
+                        .font(.system(size: 14, weight: .medium))
+                        .frame(width: 28, height: 28)
+                        .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+                .help("Switch to sidebar")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color(red: 0.11, green: 0.11, blue: 0.11))
+            
+            // Divider
+            Rectangle()
+                .fill(Color.gray.opacity(0.3))
+                .frame(height: 1)
+            
+            // Messages view (reuse the same logic)
+            ScrollViewReader { proxy in
+                ScrollView(.vertical, showsIndicators: true) {
+                    VStack(spacing: 16) {
+                        ForEach(messages) { message in
+                            MessageBubble(message: message, onMessageEdited: {
+                                // Only trigger generation if it's a user message
+                                if message.isUser {
+                                    onGenerateResponseForEditedMessage()
+                                }
+                            }, onRegenerateResponse: { aiMessage in
+                                // Only regenerate if it's an AI message
+                                if !aiMessage.isUser {
+                                    onRegenerateResponse(aiMessage)
+                                }
+                            }, onSaveMessages: {
+                                onSaveMessages()
+                            })
+                                .id(message.id)
+                        }
+                        
+                        if isTyping {
+                            TypingIndicator()
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                }
+                .scrollContentBackground(.hidden)
+                .scrollBounceBehavior(.basedOnSize)
+                .scrollIndicators(.visible)
+                .onChange(of: messages.count) {
+                    if let lastMessage = messages.last {
+                        withAnimation(.easeOut(duration: 0.3)) {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
+                    }
+                }
+            }
+            
+            // Divider
+            Rectangle()
+                .fill(Color.gray.opacity(0.3))
+                .frame(height: 1)
+            
+            // Input area (reuse the same logic)
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    VStack(spacing: 8) {
+                        // Selected text attachment inside input box
+                        if let attachment = textSelectionManager.selectedAttachment {
+                            SelectedTextAttachmentView(attachment: attachment) {
+                                textSelectionManager.clearSelection()
+                            }
+                        }
+                        
+                        HStack(spacing: 8) {
+                            TextField("Ask another question...", text: $inputText)
+                                .textFieldStyle(.plain)
+                                .foregroundColor(.white)
+                                .font(.system(size: 14))
+                                .focused($isInputFocused)
+                                .onSubmit {
+                                    onSendMessage()
+                                }
+                            
+                            Button(action: isGenerating ? onStopGeneration : onSendMessage) {
+                                Image(systemName: isGenerating ? "stop.fill" : "arrow.up")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(width: 24, height: 24)
+                                    .background(isGenerating ? Color.red : (inputText.isEmpty ? Color.gray.opacity(0.4) : Color(red: 0.0, green: 0.48, blue: 0.4)))
+                                    .clipShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!isGenerating && inputText.isEmpty)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, textSelectionManager.selectedAttachment != nil ? 12 : 14)
+                    .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
+                }
+                .padding(.horizontal, 16)
+            }
+            .padding(.vertical, 16)
+            .background(Color(red: 0.11, green: 0.11, blue: 0.11))
+        }
+        .background(Color(red: 0.11, green: 0.11, blue: 0.11))
+        .onAppear {
+            Task {
+                await ollamaManager.fetchModels()
+            }
+        }
     }
 }
 
