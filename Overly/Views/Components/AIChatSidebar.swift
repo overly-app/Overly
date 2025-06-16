@@ -370,35 +370,35 @@ struct MessageBubble: View {
                                 .frame(maxWidth: 280, alignment: .trailing)
                             
                             // User's question (main message)
-                            Text(questionPart)
-                                .font(.system(size: 14))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Color(red: 0.0, green: 0.48, blue: 0.4))
-                                .clipShape(RoundedRectangle(cornerRadius: 16))
-                                .frame(maxWidth: 280, alignment: .trailing)
-                        } else {
-                            // Fallback to regular display
-                            Text(message.content)
-                                .font(.system(size: 14))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .background(Color(red: 0.0, green: 0.48, blue: 0.4))
-                                .clipShape(RoundedRectangle(cornerRadius: 16))
-                                .frame(maxWidth: 280, alignment: .trailing)
-                        }
-                    } else {
-                        // Regular message without selected text
-                        Text(message.content)
-                            .font(.system(size: 14))
-                            .foregroundColor(.white)
+                            VStack(alignment: .trailing) {
+                                MarkdownRenderer(content: questionPart, textColor: .white)
+                            }
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
                             .background(Color(red: 0.0, green: 0.48, blue: 0.4))
                             .clipShape(RoundedRectangle(cornerRadius: 16))
                             .frame(maxWidth: 280, alignment: .trailing)
+                        } else {
+                            // Fallback to regular display
+                            VStack(alignment: .trailing) {
+                                MarkdownRenderer(content: message.content, textColor: .white)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color(red: 0.0, green: 0.48, blue: 0.4))
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .frame(maxWidth: 280, alignment: .trailing)
+                        }
+                    } else {
+                        // Regular message without selected text
+                        VStack(alignment: .trailing) {
+                            MarkdownRenderer(content: message.content, textColor: .white)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color(red: 0.0, green: 0.48, blue: 0.4))
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .frame(maxWidth: 280, alignment: .trailing)
                     }
                 }
             } else {
@@ -407,9 +407,7 @@ struct MessageBubble: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.gray)
                     
-                    Text(message.content)
-                        .font(.system(size: 14))
-                        .foregroundColor(.white)
+                    MarkdownRenderer(content: message.content, textColor: .white)
                         .textSelection(.enabled)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
