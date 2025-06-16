@@ -94,16 +94,25 @@ class OllamaManager: ObservableObject {
                     }
                     
                     for try await line in asyncBytes.lines {
-                        if let data = line.data(using: .utf8),
-                           let chatResponse = try? JSONDecoder().decode(OllamaChatResponse.self, from: data) {
-                            
-                            if let content = chatResponse.message?.content, !content.isEmpty {
-                                continuation.yield(content)
-                            }
-                            
-                            if chatResponse.done {
-                                continuation.finish()
-                                return
+                        let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmedLine.isEmpty else { continue }
+                        
+                        if let data = trimmedLine.data(using: .utf8) {
+                            do {
+                                let chatResponse = try JSONDecoder().decode(OllamaChatResponse.self, from: data)
+                                
+                                if let content = chatResponse.message?.content, !content.isEmpty {
+                                    continuation.yield(content)
+                                }
+                                
+                                if chatResponse.done {
+                                    continuation.finish()
+                                    return
+                                }
+                            } catch {
+                                // Log parsing errors for debugging
+                                print("Failed to parse Ollama response: \(error)")
+                                print("Raw line: \(trimmedLine)")
                             }
                         }
                     }

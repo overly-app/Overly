@@ -7,9 +7,9 @@
 
 import SwiftUI
 
-struct AIChatMessage: Identifiable {
+class AIChatMessage: ObservableObject, Identifiable {
     let id = UUID()
-    var content: String
+    @Published var content: String
     let isUser: Bool
     let timestamp: Date = Date()
     
@@ -251,11 +251,11 @@ struct AIChatSidebar: View {
                 
                 var fullResponse = ""
                 for try await chunk in stream {
+                    print("Received chunk: '\(chunk)'") // Debug logging
                     fullResponse += chunk
                     await MainActor.run {
-                        if let index = messages.firstIndex(where: { $0.id == aiMessage.id }) {
-                            messages[index] = AIChatMessage(content: fullResponse, isUser: false)
-                        }
+                        // Update the content directly on the ObservableObject
+                        aiMessage.content = fullResponse
                     }
                 }
                 
@@ -283,7 +283,7 @@ struct AIChatSidebar: View {
 }
 
 struct MessageBubble: View {
-    let message: AIChatMessage
+    @ObservedObject var message: AIChatMessage
     
     var body: some View {
         HStack {
