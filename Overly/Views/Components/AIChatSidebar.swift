@@ -24,6 +24,8 @@ struct AIChatSidebar: View {
     @State private var messages: [AIChatMessage] = []
     @State private var inputText: String = ""
     @State private var isTyping: Bool = false
+    @State private var isGenerating: Bool = false
+    @State private var currentTask: Task<Void, Never>?
     @FocusState private var isInputFocused: Bool
     @StateObject private var textSelectionManager = TextSelectionManager.shared
     @StateObject private var ollamaManager = OllamaManager.shared
@@ -44,6 +46,17 @@ struct AIChatSidebar: View {
         .onAppear {
             loadInitialMessages()
         }
+        .overlay(
+            // Hidden button for keyboard shortcut
+            Button("") {
+                if isGenerating {
+                    stopGeneration()
+                }
+            }
+            .keyboardShortcut(.delete, modifiers: [.command, .shift])
+            .opacity(0)
+            .allowsHitTesting(false)
+        )
     }
     
     private var headerView: some View {
@@ -163,16 +176,19 @@ struct AIChatSidebar: View {
                                 sendMessage()
                             }
                         
-                        Button(action: sendMessage) {
-                            Image(systemName: "arrow.up")
+                        Button(action: isGenerating ? stopGeneration : sendMessage) {
+                            Image(systemName: isGenerating ? "stop.fill" : "arrow.up")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(.white)
                                 .frame(width: 24, height: 24)
-                                .background(inputText.isEmpty ? Color.gray.opacity(0.4) : Color(red: 0.0, green: 0.48, blue: 0.4))
+                                .background(isGenerating ? Color.red : (inputText.isEmpty ? Color.gray.opacity(0.4) : Color(red: 0.0, green: 0.48, blue: 0.4)))
                                 .clipShape(Circle())
                         }
                         .buttonStyle(.plain)
-                        .disabled(inputText.isEmpty)
+                        .disabled(!isGenerating && inputText.isEmpty)
+                        .onChange(of: isGenerating) { newValue in
+                            print("DEBUG: Button detected isGenerating changed to: \(newValue)")
+                        }
                     }
                 }
                 .padding(.horizontal, 14)
@@ -184,6 +200,18 @@ struct AIChatSidebar: View {
         }
         .padding(.vertical, 16)
         .background(Color(red: 0.11, green: 0.11, blue: 0.11))
+        .overlay(
+            // Hidden button for keyboard shortcut
+            Button("") {
+                print("DEBUG: Keyboard shortcut triggered, isGenerating: \(isGenerating)")
+                if isGenerating {
+                    stopGeneration()
+                }
+            }
+            .keyboardShortcut(KeyEquivalent.delete, modifiers: [.command, .shift])
+            .opacity(0)
+            .allowsHitTesting(false)
+        )
     }
     
     private func sendMessage() {
@@ -214,10 +242,12 @@ struct AIChatSidebar: View {
             return
         }
         
-        // Show typing indicator
+        // Show typing indicator and set generating state
         isTyping = true
+        isGenerating = true
+        print("DEBUG: Set isGenerating = true")
         
-        Task {
+        currentTask = Task {
             do {
                 // Prepare messages for Ollama
                 var ollamaMessages: [OllamaChatMessage] = []
@@ -249,6 +279,7 @@ struct AIChatSidebar: View {
                 
                 await MainActor.run {
                     isTyping = false
+                    // Keep isGenerating = true during streaming
                 }
                 
                 // Create AI message and stream content
@@ -259,6 +290,11 @@ struct AIChatSidebar: View {
                 
                 var fullResponse = ""
                 for try await chunk in stream {
+                    // Check if task was cancelled
+                    if Task.isCancelled {
+                        break
+                    }
+                    
                     print("Received chunk: '\(chunk)'") // Debug logging
                     fullResponse += chunk
                     await MainActor.run {
@@ -267,14 +303,30 @@ struct AIChatSidebar: View {
                     }
                 }
                 
+                // Reset generation state when complete
+                await MainActor.run {
+                    isGenerating = false
+                    print("DEBUG: Set isGenerating = false (completed)")
+                }
+                
             } catch {
                 await MainActor.run {
                     isTyping = false
+                    isGenerating = false
                     let errorMessage = AIChatMessage(content: "Error: \(error.localizedDescription)", isUser: false)
                     messages.append(errorMessage)
                 }
             }
         }
+    }
+    
+    private func stopGeneration() {
+        print("DEBUG: stopGeneration called")
+        currentTask?.cancel()
+        currentTask = nil
+        isTyping = false
+        isGenerating = false
+        print("DEBUG: Set isGenerating = false (stopped)")
     }
     
     private func loadInitialMessages() {
