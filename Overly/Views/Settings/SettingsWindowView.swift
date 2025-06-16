@@ -26,12 +26,12 @@ struct SettingsWindowView: View {
                 .tag("Providers")
                 
                 NavigationLink(value: "API") {
-                    Label("API Keys", systemImage: "key")
+                    Label("Ollama", systemImage: "server.rack")
                 }
                 .tag("API")
                 
                 NavigationLink(value: "Models") {
-                    Label("Models", systemImage: "brain")
+                    Label("Ollama Models", systemImage: "brain")
                 }
                 .tag("Models")
                 

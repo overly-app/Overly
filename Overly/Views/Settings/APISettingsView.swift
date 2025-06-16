@@ -18,9 +18,8 @@ struct APISettingsView: View {
             VStack(alignment: .leading, spacing: 24) {
                 headerSection
                 
-                ForEach(KeychainManager.APIProvider.allCases, id: \.self) { provider in
-                    providerSection(for: provider)
-                }
+                // Only show Ollama base URL override
+                providerSection(for: .ollama)
             }
             .padding(24)
         }
@@ -32,11 +31,11 @@ struct APISettingsView: View {
     
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("API Configuration")
+            Text("Ollama Configuration")
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("Configure your API keys and endpoints for different AI providers. All credentials are securely stored in your system keychain.")
+            Text("Configure your Ollama base URL override. This allows you to connect to a remote Ollama instance.")
                 .font(.body)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -58,43 +57,14 @@ struct APISettingsView: View {
             }
             
             VStack(alignment: .leading, spacing: 8) {
-                // API Key field
+                // Base URL field for Ollama
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("API Key")
+                    Text("Base URL")
                         .font(.subheadline)
                         .fontWeight(.medium)
                     
-                    HStack {
-                        Group {
-                            if showingPasswords[provider] == true {
-                                TextField("Enter your \(provider.displayName) API key", text: binding(for: provider, type: .apiKey))
-                            } else {
-                                SecureField("Enter your \(provider.displayName) API key", text: binding(for: provider, type: .apiKey))
-                            }
-                        }
+                    TextField("Enter base URL (default: http://localhost:11434)", text: binding(for: provider, type: .baseURL))
                         .textFieldStyle(.roundedBorder)
-                        
-                        Button(action: {
-                            showingPasswords[provider] = !(showingPasswords[provider] ?? false)
-                        }) {
-                            Image(systemName: showingPasswords[provider] == true ? "eye.slash" : "eye")
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                        .help(showingPasswords[provider] == true ? "Hide API key" : "Show API key")
-                    }
-                }
-                
-                // Base URL field (for providers that support custom endpoints)
-                if provider == .ollama || provider == .customOpenAI {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Base URL")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                        
-                        TextField("Enter base URL", text: binding(for: provider, type: .baseURL))
-                            .textFieldStyle(.roundedBorder)
-                    }
                 }
             }
             
@@ -103,7 +73,6 @@ struct APISettingsView: View {
                     saveCredentials(for: provider)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(apiKeys[provider]?.isEmpty != false)
                 
                 if hasStoredCredentials(for: provider) {
                     Button("Clear") {
@@ -174,11 +143,8 @@ struct APISettingsView: View {
     }
     
     private func loadStoredCredentials() {
-        for provider in KeychainManager.APIProvider.allCases {
-            apiKeys[provider] = KeychainManager.shared.getAPIKey(for: provider) ?? ""
-            baseURLs[provider] = KeychainManager.shared.getBaseURL(for: provider) ?? provider.defaultBaseURL
-            showingPasswords[provider] = false
-        }
+        // Only load Ollama base URL
+        baseURLs[.ollama] = KeychainManager.shared.getBaseURL(for: .ollama) ?? KeychainManager.APIProvider.ollama.defaultBaseURL
     }
     
     private func saveCredentials(for provider: KeychainManager.APIProvider) {
@@ -187,16 +153,9 @@ struct APISettingsView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             var success = true
             
-            // Save API key
-            if let apiKey = apiKeys[provider], !apiKey.isEmpty {
-                success = success && KeychainManager.shared.saveAPIKey(apiKey, for: provider)
-            }
-            
-            // Save base URL if applicable
-            if provider == .ollama || provider == .customOpenAI {
-                if let baseURL = baseURLs[provider], !baseURL.isEmpty {
-                    success = success && KeychainManager.shared.saveBaseURL(baseURL, for: provider)
-                }
+            // Save base URL for Ollama
+            if let baseURL = baseURLs[provider], !baseURL.isEmpty {
+                success = success && KeychainManager.shared.saveBaseURL(baseURL, for: provider)
             }
             
             saveStatus[provider] = success ? .success : .error
@@ -209,17 +168,15 @@ struct APISettingsView: View {
     }
     
     private func clearCredentials(for provider: KeychainManager.APIProvider) {
-        _ = KeychainManager.shared.deleteAPIKey(for: provider)
         _ = KeychainManager.shared.deleteBaseURL(for: provider)
         
-        apiKeys[provider] = ""
         baseURLs[provider] = provider.defaultBaseURL
         
         saveStatus[provider] = SaveStatus.none
     }
     
     private func hasStoredCredentials(for provider: KeychainManager.APIProvider) -> Bool {
-        return KeychainManager.shared.getAPIKey(for: provider) != nil
+        return KeychainManager.shared.getBaseURL(for: provider) != provider.defaultBaseURL
     }
 }
 

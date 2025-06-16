@@ -49,7 +49,7 @@ struct ProviderSettingsView: View {
                                      }
                                  }
                              ), 
-                             providers: settings.activeProviders.filter { $0.url != nil }, 
+                             providers: settings.activeProviders.filter { $0.id != "Settings" }, 
                              settings: settings
                          )
                          
@@ -74,7 +74,7 @@ struct ProviderSettingsView: View {
                      .foregroundColor(.primary)
                  
                  FlowLayoutSettings(spacing: 8) {
-                     ForEach(settings.allBuiltInProviders.filter { $0.url != nil }) { provider in
+                     ForEach(settings.allBuiltInProviders.filter { $0.id != "Settings" }) { provider in
                          ProviderChipViewSettings(provider: provider, settings: settings, onDelete: deleteCustomProvider)
                      }
                  }

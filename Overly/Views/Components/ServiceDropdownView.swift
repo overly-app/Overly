@@ -15,7 +15,7 @@ struct ServiceDropdownView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(settings.activeProviders.filter { $0.url != nil }) { provider in
+            ForEach(settings.activeProviders.filter { $0.id != "Settings" }) { provider in
                 Button(action: {
                     selectedProvider = provider
                     dismiss()

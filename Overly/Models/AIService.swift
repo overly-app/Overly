@@ -15,6 +15,7 @@ enum AIService: String, CaseIterable, Identifiable {
     case copilot = "Copilot"
     case claude = "Claude"
     case t3chat = "T3 Chat"
+    case aichat = "AI Chat"
     case settings = "Settings"
 
     var id: String { self.rawValue }
@@ -28,6 +29,7 @@ enum AIService: String, CaseIterable, Identifiable {
         case .copilot: return URL(string: "https://copilot.microsoft.com")!
         case .claude: return URL(string: "https://claude.ai")!
         case .t3chat: return URL(string: "https://t3.chat")!
+        case .aichat: return nil // Native chat interface
         case .settings: return nil
         }
     }
@@ -41,6 +43,7 @@ enum AIService: String, CaseIterable, Identifiable {
         case .copilot: return "link"
         case .claude: return "link"
         case .t3chat: return "link"
+        case .aichat: return "message.badge"
         case .settings: return "gearshape"
         }
     }

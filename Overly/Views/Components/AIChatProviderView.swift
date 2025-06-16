@@ -1,5 +1,5 @@
 //
-//  AIChatSidebar.swift
+//  AIChatProviderView.swift
 //  Overly
 //
 //  Created by AI Assistant on 1/27/25.
@@ -7,8 +7,7 @@
 
 import SwiftUI
 
-struct AIChatSidebar: View {
-    @Binding var isVisible: Bool
+struct AIChatProviderView: View {
     @State private var messages: [AIChatMessage] = []
     @State private var inputText: String = ""
     @State private var isTyping: Bool = false
@@ -18,7 +17,6 @@ struct AIChatSidebar: View {
     @StateObject private var textSelectionManager = TextSelectionManager.shared
     @StateObject private var providerManager = AIProviderManager.shared
     @State private var showModelPicker = false
-    @StateObject private var sidebarManager = AIChatSidebarManager.shared
     
     var body: some View {
         VStack(spacing: 0) {
@@ -31,7 +29,7 @@ struct AIChatSidebar: View {
             // Input area
             inputView
         }
-        .background(Color(red: 0.11, green: 0.11, blue: 0.11)) // Dark background like the image
+        .background(Color(red: 0.11, green: 0.11, blue: 0.11))
         .onAppear {
             loadPersistedMessages()
         }
@@ -54,7 +52,7 @@ struct AIChatSidebar: View {
     private var headerView: some View {
         VStack(spacing: 8) {
             HStack {
-                Text("AI Assistant")
+                Text("AI Chat")
                     .font(.headline)
                     .foregroundColor(.white)
                 
@@ -70,57 +68,6 @@ struct AIChatSidebar: View {
                 }
                 .buttonStyle(.plain)
                 .help("Start new chat")
-                
-                // Display mode dropdown
-                Menu {
-                    ForEach(AIChatSidebarManager.ChatDisplayMode.allCases, id: \.self) { mode in
-                        Button(action: {
-                            switchDisplayMode(to: mode)
-                        }) {
-                            HStack {
-                                Image(systemName: mode.icon)
-                                Text(mode.rawValue)
-                                if sidebarManager.displayMode == mode {
-                                    Spacer()
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: sidebarManager.displayMode.icon)
-                            .font(.system(size: 12))
-                            .foregroundColor(.gray)
-                        
-                        Text(sidebarManager.displayMode.rawValue)
-                            .font(.system(size: 12))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                        
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 10))
-                            .foregroundColor(.gray)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color(red: 0.15, green: 0.15, blue: 0.15))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                }
-                .buttonStyle(.plain)
-                .help("Change display mode")
-                
-                Button(action: {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        isVisible = false
-                    }
-                }) {
-                    Image(systemName: "xmark")
-                        .foregroundColor(.gray)
-                        .font(.system(size: 14, weight: .medium))
-                }
-                .buttonStyle(.plain)
-                .help("Close sidebar")
             }
             
             // Model picker
@@ -224,7 +171,7 @@ struct AIChatSidebar: View {
                     }
                     
                     HStack(spacing: 8) {
-                        TextField("Ask another question...", text: $inputText)
+                        TextField("Ask a question...", text: $inputText)
                             .textFieldStyle(.plain)
                             .foregroundColor(.white)
                             .font(.system(size: 14))
@@ -243,32 +190,17 @@ struct AIChatSidebar: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(!isGenerating && inputText.isEmpty)
-                        .onChange(of: isGenerating) { newValue in
-                            print("DEBUG: Button detected isGenerating changed to: \(newValue)")
-                        }
                     }
                 }
                 .padding(.horizontal, 14)
-                .padding(.vertical, textSelectionManager.selectedAttachment != nil ? 12 : 14) // Dynamic padding based on attachment
-                .background(Color(red: 0.15, green: 0.15, blue: 0.15)) // Slightly lighter than main background
+                .padding(.vertical, textSelectionManager.selectedAttachment != nil ? 12 : 14)
+                .background(Color(red: 0.15, green: 0.15, blue: 0.15))
                 .clipShape(RoundedRectangle(cornerRadius: 24))
             }
             .padding(.horizontal, 16)
         }
         .padding(.vertical, 16)
         .background(Color(red: 0.11, green: 0.11, blue: 0.11))
-        .overlay(
-            // Hidden button for keyboard shortcut
-            Button("") {
-                print("DEBUG: Keyboard shortcut triggered, isGenerating: \(isGenerating)")
-                if isGenerating {
-                    stopGeneration()
-                }
-            }
-            .keyboardShortcut(KeyEquivalent.delete, modifiers: [.command, .shift])
-            .opacity(0)
-            .allowsHitTesting(false)
-        )
     }
     
     private func sendMessage() {
@@ -302,7 +234,6 @@ struct AIChatSidebar: View {
         // Show typing indicator and set generating state
         isTyping = true
         isGenerating = true
-        print("DEBUG: Set isGenerating = true")
         
         currentTask = Task {
             do {
@@ -353,7 +284,6 @@ struct AIChatSidebar: View {
                         break
                     }
                     
-                    print("Received chunk: '\(chunk)'") // Debug logging
                     fullResponse += chunk
                     await MainActor.run {
                         // Update the content directly on the ObservableObject
@@ -371,7 +301,6 @@ struct AIChatSidebar: View {
                 await MainActor.run {
                     aiMessage.markGenerationComplete() // Mark as complete
                     isGenerating = false
-                    print("DEBUG: Set isGenerating = false (completed)")
                     // Save messages after completion
                     saveMessagesToPersistence()
                 }
@@ -390,12 +319,10 @@ struct AIChatSidebar: View {
     }
     
     private func stopGeneration() {
-        print("DEBUG: stopGeneration called")
         currentTask?.cancel()
         currentTask = nil
         isTyping = false
         isGenerating = false
-        print("DEBUG: Set isGenerating = false (stopped)")
     }
     
     private func loadPersistedMessages() {
@@ -467,7 +394,6 @@ struct AIChatSidebar: View {
         // Show typing indicator and set generating state
         isTyping = true
         isGenerating = true
-        print("DEBUG: Set isGenerating = true (edited message)")
         
         currentTask = Task {
             do {
@@ -504,7 +430,6 @@ struct AIChatSidebar: View {
                         break
                     }
                     
-                    print("Received chunk: '\(chunk)'") // Debug logging
                     fullResponse += chunk
                     await MainActor.run {
                         // Update the content directly on the ObservableObject
@@ -522,7 +447,6 @@ struct AIChatSidebar: View {
                 await MainActor.run {
                     aiMessage.markGenerationComplete() // Mark as complete
                     isGenerating = false
-                    print("DEBUG: Set isGenerating = false (edited message completed)")
                     // Save messages after completion
                     saveMessagesToPersistence()
                 }
@@ -558,7 +482,6 @@ struct AIChatSidebar: View {
         isTyping = true
         isGenerating = true
         message.startGenerating() // Mark this specific message as generating
-        print("DEBUG: Set isGenerating = true (regenerating)")
         
         currentTask = Task {
             do {
@@ -588,7 +511,6 @@ struct AIChatSidebar: View {
                         break
                     }
                     
-                    print("Received chunk: '\(chunk)'") // Debug logging
                     fullResponse += chunk
                     await MainActor.run {
                         // Update the message content and add to responses
@@ -600,7 +522,6 @@ struct AIChatSidebar: View {
                 await MainActor.run {
                     message.markGenerationComplete() // Mark this specific message as complete
                     isGenerating = false
-                    print("DEBUG: Set isGenerating = false (regeneration completed)")
                     // Save messages after completion
                     saveMessagesToPersistence()
                 }
@@ -617,132 +538,9 @@ struct AIChatSidebar: View {
             }
         }
     }
-    
-    private func switchDisplayMode(to mode: AIChatSidebarManager.ChatDisplayMode) {
-        // Prevent rapid switching
-        guard sidebarManager.displayMode != mode else { return }
-        
-        sidebarManager.displayMode = mode
-        
-        switch mode {
-        case .sidebar:
-            // Close floating window if it exists
-            if let window = sidebarManager.floatingWindow {
-                window.delegate = nil // Clear delegate first
-                window.close()
-            }
-            sidebarManager.floatingWindow = nil
-            sidebarManager.windowDelegate = nil // Clear delegate reference
-            // Show sidebar
-            isVisible = true
-            
-        case .floating:
-            // Hide sidebar
-            isVisible = false
-            // Create floating window
-            createFloatingWindow()
-        }
-    }
-    
-    private func createFloatingWindow() {
-        // Close existing window if any
-        sidebarManager.floatingWindow?.close()
-        
-        // Create new floating window with custom properties
-        let window = NSWindow(
-            contentRect: NSRect(x: 100, y: 100, width: 400, height: 600),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable],
-            backing: .buffered,
-            defer: false
-        )
-        
-        window.title = "AI Assistant"
-        window.isReleasedWhenClosed = false
-        window.center()
-        
-        // Set window level to float above other windows including borderless ones
-        window.level = .floating
-        
-        // Make it stay on top and visible
-        window.hidesOnDeactivate = false
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        
-        // Set appearance
-        window.titlebarAppearsTransparent = false
-        window.backgroundColor = NSColor(red: 0.11, green: 0.11, blue: 0.11, alpha: 1.0)
-        
-        // Create the floating chat view
-        let floatingChatView = FloatingChatView(
-            messages: $messages,
-            inputText: $inputText,
-            isTyping: $isTyping,
-            isGenerating: $isGenerating,
-            currentTask: $currentTask,
-            textSelectionManager: textSelectionManager,
-            providerManager: providerManager,
-            showModelPicker: $showModelPicker,
-            onSwitchToSidebar: {
-                // Use DispatchQueue.main.async to safely update state
-                DispatchQueue.main.async {
-                    self.switchDisplayMode(to: .sidebar)
-                }
-            },
-            onStartNewChat: {
-                startNewChat()
-            },
-            onSaveMessages: {
-                saveMessagesToPersistence()
-            },
-            onGenerateResponseForEditedMessage: {
-                generateResponseForEditedMessage()
-            },
-            onRegenerateResponse: { message in
-                regenerateResponse(for: message)
-            },
-            onSendMessage: {
-                sendMessage()
-            },
-            onStopGeneration: {
-                stopGeneration()
-            }
-        )
-        
-        window.contentView = NSHostingView(rootView: floatingChatView)
-        window.makeKeyAndOrderFront(nil)
-        
-        // Ensure it's visible and focused
-        window.orderFrontRegardless()
-        NSApp.activate(ignoringOtherApps: true)
-        
-        // Store reference in the shared manager
-        sidebarManager.floatingWindow = window
-        
-        // Handle window closing with safer callback
-        let delegate = FloatingWindowDelegate {
-            // Use DispatchQueue.main.async to safely update state
-            DispatchQueue.main.async {
-                self.sidebarManager.displayMode = .sidebar
-                self.sidebarManager.floatingWindow = nil
-                self.sidebarManager.windowDelegate = nil
-                self.isVisible = true
-            }
-        }
-        window.delegate = delegate
-        sidebarManager.windowDelegate = delegate // Store strong reference
-    }
 }
 
-
-
-
-
-
-
-
-
-
-
 #Preview {
-    AIChatSidebar(isVisible: .constant(true))
-        .frame(width: 300, height: 500)
+    AIChatProviderView()
+        .frame(width: 800, height: 600)
 } 

@@ -4,46 +4,30 @@ import SwiftUI
 // MARK: - Provider Types
 
 enum AIProvider: String, CaseIterable, Identifiable, Codable {
-    case openai = "openai"
-    case gemini = "gemini"
-    case anthropic = "anthropic"
     case ollama = "ollama"
     
     var id: String { rawValue }
     
     var displayName: String {
         switch self {
-        case .openai: return "OpenAI"
-        case .gemini: return "Google Gemini"
-        case .anthropic: return "Anthropic"
         case .ollama: return "Ollama"
         }
     }
     
     var iconName: String {
         switch self {
-        case .openai: return "openai"
-        case .gemini: return "gemini"
-        case .anthropic: return "anthropic"
         case .ollama: return "server.rack"
         }
     }
     
     var requiresAPIKey: Bool {
         switch self {
-        case .openai, .gemini, .anthropic: return true
         case .ollama: return false
         }
     }
     
     var defaultModels: [String] {
         switch self {
-        case .openai:
-            return ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"]
-        case .gemini:
-            return ["gemini-pro", "gemini-pro-vision"]
-        case .anthropic:
-            return ["claude-3-opus", "claude-3-sonnet", "claude-3-haiku"]
         case .ollama:
             return [] // Fetched dynamically
         }
@@ -51,9 +35,6 @@ enum AIProvider: String, CaseIterable, Identifiable, Codable {
     
     var baseURL: String {
         switch self {
-        case .openai: return "https://api.openai.com/v1"
-        case .gemini: return "https://generativelanguage.googleapis.com/v1beta"
-        case .anthropic: return "https://api.anthropic.com"
         case .ollama: return "http://localhost:11434"
         }
     }
@@ -146,26 +127,11 @@ class AIProviderManager: ObservableObject {
     // MARK: - Provider Management
     
     var availableProviders: [AIProvider] {
-        return AIProvider.allCases.filter { provider in
-            if provider.requiresAPIKey {
-                return hasAPIKey(for: provider)
-            }
-            return true // Ollama doesn't need API key
-        }
+        return AIProvider.allCases // Only Ollama now, no API key needed
     }
     
     func hasAPIKey(for provider: AIProvider) -> Bool {
-        guard provider.requiresAPIKey else { return true }
-        
-        let keychainProvider: KeychainManager.APIProvider
-        switch provider {
-        case .openai: keychainProvider = .openai
-        case .gemini: keychainProvider = .gemini
-        case .anthropic: keychainProvider = .anthropic
-        case .ollama: return true
-        }
-        
-        return keychainManager.getAPIKey(for: keychainProvider) != nil
+        return true // Ollama doesn't need API key
     }
     
     func setSelectedProvider(_ provider: AIProvider) {
@@ -195,37 +161,20 @@ class AIProviderManager: ObservableObject {
         
         var allModels: [AIModel] = []
         
-        // Add static models for providers with API keys
-        for provider in availableProviders {
-            switch provider {
-            case .openai, .gemini, .anthropic:
-                let models = provider.defaultModels.map { modelName in
-                    AIModel(
-                        id: "\(provider.rawValue)_\(modelName)",
-                        name: modelName,
-                        provider: provider,
-                        displayName: modelName
-                    )
-                }
-                allModels.append(contentsOf: models)
-                
-            case .ollama:
-                // Fetch Ollama models dynamically
-                do {
-                    await ollamaManager.fetchModels()
-                    let ollamaModels = ollamaManager.availableModels.map { ollamaModel in
-                        AIModel(
-                            id: "ollama_\(ollamaModel.name)",
-                            name: ollamaModel.name,
-                            provider: .ollama,
-                            displayName: ollamaModel.displayName
-                        )
-                    }
-                    allModels.append(contentsOf: ollamaModels)
-                } catch {
-                    self.error = "Failed to fetch Ollama models: \(error.localizedDescription)"
-                }
+        // Fetch Ollama models dynamically
+        do {
+            await ollamaManager.fetchModels()
+            let ollamaModels = ollamaManager.availableModels.map { ollamaModel in
+                AIModel(
+                    id: "ollama_\(ollamaModel.name)",
+                    name: ollamaModel.name,
+                    provider: .ollama,
+                    displayName: ollamaModel.displayName
+                )
             }
+            allModels.append(contentsOf: ollamaModels)
+        } catch {
+            self.error = "Failed to fetch Ollama models: \(error.localizedDescription)"
         }
         
         // Preserve enabled/disabled state
@@ -291,57 +240,10 @@ class AIProviderManager: ObservableObject {
             throw NSError(domain: "AIProviderManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "No model selected"])
         }
         
-        switch selectedProvider {
-        case .ollama:
-            let ollamaMessages = messages.map { OllamaChatMessage(role: $0.role, content: $0.content) }
-            return try await ollamaManager.sendChatMessage(messages: ollamaMessages)
-            
-        case .openai:
-            return try await sendOpenAIMessage(messages)
-            
-        case .gemini:
-            return try await sendGeminiMessage(messages)
-            
-        case .anthropic:
-            return try await sendAnthropicMessage(messages)
-        }
+        // Only Ollama is supported now
+        let ollamaMessages = messages.map { OllamaChatMessage(role: $0.role, content: $0.content) }
+        return try await ollamaManager.sendChatMessage(messages: ollamaMessages)
     }
     
-    // MARK: - Provider-specific implementations
-    
-    private func sendOpenAIMessage(_ messages: [AIProviderMessage]) async throws -> AsyncThrowingStream<String, Error> {
-        guard let apiKey = keychainManager.getAPIKey(for: .openai) else {
-            throw NSError(domain: "AIProviderManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "OpenAI API key not found"])
-        }
-        
-        // TODO: Implement OpenAI API call
-        return AsyncThrowingStream { continuation in
-            continuation.yield("OpenAI integration coming soon...")
-            continuation.finish()
-        }
-    }
-    
-    private func sendGeminiMessage(_ messages: [AIProviderMessage]) async throws -> AsyncThrowingStream<String, Error> {
-        guard let apiKey = keychainManager.getAPIKey(for: .gemini) else {
-            throw NSError(domain: "AIProviderManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "Gemini API key not found"])
-        }
-        
-        // TODO: Implement Gemini API call
-        return AsyncThrowingStream { continuation in
-            continuation.yield("Gemini integration coming soon...")
-            continuation.finish()
-        }
-    }
-    
-    private func sendAnthropicMessage(_ messages: [AIProviderMessage]) async throws -> AsyncThrowingStream<String, Error> {
-        guard let apiKey = keychainManager.getAPIKey(for: .anthropic) else {
-            throw NSError(domain: "AIProviderManager", code: 2, userInfo: [NSLocalizedDescriptionKey: "Anthropic API key not found"])
-        }
-        
-        // TODO: Implement Anthropic API call
-        return AsyncThrowingStream { continuation in
-            continuation.yield("Anthropic integration coming soon...")
-            continuation.finish()
-        }
-    }
+
 } 

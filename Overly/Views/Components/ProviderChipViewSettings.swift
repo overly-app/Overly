@@ -22,7 +22,7 @@ struct ProviderChipViewSettings: View {
 
     var body: some View {
         Button(action: {
-            if provider.url != nil {
+            if provider.id != "Settings" {
                 settings.toggleActiveProvider(id: provider.id)
             }
         }) {
@@ -85,7 +85,7 @@ struct ProviderChipViewSettings: View {
             )
         }
         .buttonStyle(.plain)
-        .disabled(provider.url == nil)
-        .opacity(provider.url == nil ? 0.5 : 1.0)
+        .disabled(provider.id == "Settings")
+        .opacity(provider.id == "Settings" ? 0.5 : 1.0)
     }
 } 

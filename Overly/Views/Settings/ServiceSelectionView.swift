@@ -175,7 +175,7 @@ struct ServiceSelectionView: View {
                         
                         // Wrapping layout for chips
                         FlowLayout(spacing: 8) {
-                            ForEach(settings.allBuiltInProviders.filter { $0.url != nil }) { provider in
+                            ForEach(settings.allBuiltInProviders.filter { $0.id != "Settings" }) { provider in
                                 ProviderChipView(provider: provider, settings: settings, onDelete: deleteCustomProvider)
                             }
                         }

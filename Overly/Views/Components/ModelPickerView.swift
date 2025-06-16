@@ -10,12 +10,11 @@ import SwiftUI
 struct ModelPickerView: View {
     @StateObject private var providerManager = AIProviderManager.shared
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedProvider: AIProvider?
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Select AI Model")
+                Text("Select Ollama Model")
                     .font(.headline)
                     .foregroundColor(.primary)
                 
@@ -29,29 +28,6 @@ struct ModelPickerView: View {
                 .font(.caption)
             }
             
-            // Provider selector
-            if providerManager.availableProviders.count > 1 {
-                HStack {
-                    Text("Provider:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    Picker("Provider", selection: Binding(
-                        get: { selectedProvider ?? providerManager.selectedProvider },
-                        set: { newProvider in
-                            selectedProvider = newProvider
-                            providerManager.setSelectedProvider(newProvider)
-                        }
-                    )) {
-                        ForEach(providerManager.availableProviders) { provider in
-                            Text(provider.displayName).tag(provider)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .font(.caption)
-                }
-            }
-            
             if providerManager.isLoading {
                 HStack {
                     ProgressView()
@@ -61,29 +37,22 @@ struct ModelPickerView: View {
                         .foregroundColor(.secondary)
                 }
                 .padding(.vertical, 20)
-            } else if providerManager.currentProviderModels.isEmpty {
+            } else if providerManager.availableModels.isEmpty {
                 VStack(spacing: 8) {
                     Text("No models found")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
-                    if providerManager.selectedProvider == .ollama {
-                        Text("Make sure Ollama is running and has models installed")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                    } else {
-                        Text("Check your API key and try refreshing")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
+                    Text("Make sure Ollama is running and has models installed")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
                 }
                 .padding(.vertical, 20)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 4) {
-                        ForEach(providerManager.currentProviderModels) { model in
+                        ForEach(providerManager.availableModels) { model in
                             AIModelRow(
                                 model: model,
                                 isSelected: model.name == providerManager.selectedModel
@@ -107,7 +76,6 @@ struct ModelPickerView: View {
         .padding(16)
         .frame(minWidth: 320)
         .onAppear {
-            selectedProvider = providerManager.selectedProvider
             if providerManager.availableModels.isEmpty {
                 Task {
                     await providerManager.refreshAllModels()

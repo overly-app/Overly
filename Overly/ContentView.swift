@@ -16,9 +16,7 @@ struct ContentView: View {
     @State private var isLoading: Bool = false
     @AppStorage("hasCompletedOnboarding") var hasCompletedOnboarding: Bool = false
     @State private var showCommandPalette: Bool = false
-    @State private var showAISidebar: Bool = false
     @AppStorage("useNativeChat") var useNativeChat: Bool = false
-    @StateObject private var sidebarManager = AIChatSidebarManager.shared
 
     var body: some View {
         if hasCompletedOnboarding {
@@ -40,6 +38,9 @@ struct ContentView: View {
                         Group {
                             if useNativeChat {
                                 NativeChatView()
+                            } else if selectedProvider?.id == "AI Chat" {
+                                // Show AI Chat provider view
+                                AIChatProviderView()
                             } else {
                                 // WebView with overlaid progress bar
                                 ZStack(alignment: .top) {
@@ -54,26 +55,12 @@ struct ContentView: View {
                                 }
                             }
                         }
-                        
-                        // AI Sidebar
-                        if showAISidebar {
-                            ResizableDivider(width: Binding(
-                                get: { settings.sidebarWidth },
-                                set: { settings.updateSidebarWidth($0) }
-                            ), minWidth: 250, maxWidth: 800)
-                            
-                            AIChatSidebar(isVisible: $showAISidebar)
-                                .frame(width: settings.sidebarWidth)
-                                .transition(.move(edge: .trailing))
-                                .allowsHitTesting(true) // Prevent window dragging conflicts
-                        }
                     }
                 }
                 .onAppear {
                     setupWindow()
                     initializeSelectedProvider()
                     fetchFaviconsForActiveProviders()
-                    setupSidebarToggle()
                 }
                 
                 // Command palette overlay (only for WebView mode)
@@ -148,17 +135,7 @@ struct ContentView: View {
         showCommandPalette = true
     }
     
-    // Setup sidebar toggle
-    private func setupSidebarToggle() {
-        if let window = window as? BorderlessWindow {
-            window.toggleSidebarAction = { [self] in
-                DispatchQueue.main.async {
-                    // Use the shared manager to handle the toggle
-                    self.sidebarManager.handleToggleShortcut(sidebarVisibility: self.$showAISidebar)
-                }
-            }
-        }
-    }
+
 }
 
 #Preview {

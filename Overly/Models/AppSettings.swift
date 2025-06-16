@@ -14,8 +14,8 @@ struct ChatProvider: Identifiable, Codable, Equatable {
 // Extension to convert AIService to ChatProvider
 extension AIService {
     var asChatProvider: ChatProvider {
-        // Check if the iconName corresponds to a known SF Symbol (like "link" or "gearshape")
-        let isSFsymbol = iconName == "link" || iconName == "gearshape"
+        // Check if the iconName corresponds to a known SF Symbol
+        let isSFsymbol = iconName == "link" || iconName == "gearshape" || iconName == "message.badge"
         
         return ChatProvider(
             id: self.rawValue,
@@ -95,7 +95,7 @@ class AppSettings: ObservableObject, @unchecked Sendable {
             activeProviderIds = decodedActiveIds
         } else {
             // If no active IDs saved, default to all built-in ones except settings
-            activeProviderIds = Set(allBuiltInProviders.filter { $0.url != nil }.map { $0.id })
+            activeProviderIds = Set(allBuiltInProviders.filter { $0.id != "Settings" }.map { $0.id })
         }
         
         // Load favicon cache
