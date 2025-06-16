@@ -81,7 +81,6 @@ class HotkeyManager: ObservableObject {
         print("HotkeyManager: Creating hotkey with key: \(settings.toggleHotkeyKey) and modifiers: \(hotkeyModifiers)")
         toggleHotKey = HotKey(key: settings.toggleHotkeyKey, modifiers: hotkeyModifiers)
         toggleHotKey?.keyDownHandler = { [weak self] in
-            print("HotkeyManager: Toggle hotkey pressed!")
             self?.toggleWindowAction?()
         }
         print("HotkeyManager: Hotkey created and handler set")
