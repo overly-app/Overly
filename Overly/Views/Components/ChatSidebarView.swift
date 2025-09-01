@@ -91,6 +91,11 @@ struct ChatSidebarView: View {
     private var newChatButton: some View {
         Button(action: {
             AIChatMessageManager.shared.startNewChat()
+            // Post notification to show prompt suggestions in main chat view
+            NotificationCenter.default.post(
+                name: NSNotification.Name("ShowPromptSuggestions"),
+                object: nil
+            )
         }) {
             HStack {
                 Image(systemName: "plus.circle.fill")

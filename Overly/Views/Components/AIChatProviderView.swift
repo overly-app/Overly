@@ -9,6 +9,7 @@ import SwiftUI
 
 struct AIChatProviderView: View {
     @State private var inputText: String = ""
+    @State private var showPromptSuggestions = false
     @StateObject private var textSelectionManager = TextSelectionManager.shared
     @StateObject private var messageManager = AIChatMessageManager.shared
     @StateObject private var chatSessionManager = ChatSessionManager.shared
@@ -25,20 +26,31 @@ struct AIChatProviderView: View {
                 AIChatHeaderView(
                     providerManager: AIProviderManager.shared,
                     showModelPicker: $showModelPicker,
-                    onNewChat: messageManager.startNewChat
+                    onNewChat: {
+                        messageManager.startNewChat()
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showPromptSuggestions = true
+                        }
+                    }
                 )
                 
-                // Messages
-                messagesView
+                // Messages or Prompt Suggestions
+                if showPromptSuggestions && messageManager.messages.isEmpty {
+                    promptSuggestionsView
+                } else {
+                    messagesView
+                }
                 
                 // Input area
-                AIChatInputView(
-                    inputText: $inputText,
-                    isGenerating: $messageManager.isGenerating,
-                    textSelectionManager: textSelectionManager,
-                    onSendMessage: sendMessage,
-                    onStopGeneration: messageManager.stopGeneration
-                )
+                if !showPromptSuggestions {
+                    AIChatInputView(
+                        inputText: $inputText,
+                        isGenerating: $messageManager.isGenerating,
+                        textSelectionManager: textSelectionManager,
+                        onSendMessage: sendMessage,
+                        onStopGeneration: messageManager.stopGeneration
+                    )
+                }
             }
         }
         .background(Color(red: 0.11, green: 0.11, blue: 0.11))
@@ -48,6 +60,10 @@ struct AIChatProviderView: View {
         }
         .onChange(of: chatSessionManager.currentSessionId) { _ in
             messageManager.loadPersistedMessages()
+            // Hide prompt suggestions when switching to an existing chat
+            if !messageManager.messages.isEmpty {
+                showPromptSuggestions = false
+            }
         }
         .onDisappear {
             messageManager.saveMessagesToPersistence()
@@ -63,6 +79,57 @@ struct AIChatProviderView: View {
             .opacity(0)
             .allowsHitTesting(false)
         )
+    }
+    
+    private var promptSuggestionsView: some View {
+        VStack(spacing: 32) {
+            Spacer()
+            
+            // Greeting
+            Text("How can I help you today?")
+                .font(.system(size: 32, weight: .bold))
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+            
+            // Centered input box
+            VStack(spacing: 16) {
+                HStack(spacing: 0) {
+                    TextField("Type your message here...", text: $inputText)
+                        .textFieldStyle(PlainTextFieldStyle())
+                        .font(.system(size: 16))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                        .onSubmit {
+                            if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                showPromptSuggestions = false
+                                sendMessage()
+                            }
+                        }
+                    
+                    Button(action: {
+                        if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            showPromptSuggestions = false
+                            sendMessage()
+                        }
+                    }) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.accentColor)
+                            .padding(.trailing, 16)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .background(Color(red: 0.15, green: 0.15, blue: 0.15))
+                .cornerRadius(12)
+                .frame(width: 400)
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     private var messagesView: some View {
@@ -113,6 +180,9 @@ struct AIChatProviderView: View {
         // Clear input and selection
         inputText = ""
         textSelectionManager.clearSelection()
+        
+        // Hide prompt suggestions when a message is sent
+        showPromptSuggestions = false
     }
     
     private func setupNotificationObservers() {
@@ -157,6 +227,30 @@ struct AIChatProviderView: View {
                     inputText = query
                     sendMessage()
                 }
+            }
+        }
+        
+        // Observer for setting prompt from sidebar
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SetPromptAndSend"),
+            object: nil,
+            queue: .main
+        ) { notification in
+            if let userInfo = notification.userInfo,
+               let prompt = userInfo["prompt"] as? String {
+                inputText = prompt
+                sendMessage()
+            }
+        }
+        
+        // Observer for showing prompt suggestions from sidebar
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("ShowPromptSuggestions"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showPromptSuggestions = true
             }
         }
     }
