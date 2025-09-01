@@ -18,6 +18,28 @@ class AIChatMessageManager: ObservableObject {
     private var currentTask: Task<Void, Never>?
     private let providerManager = AIProviderManager.shared
     
+    // Helper function to parse and format streaming content with think blocks
+    private func formatStreamingContent(_ content: String) -> String {
+        var formattedContent = content
+        
+        // Look for incomplete think blocks and format them properly
+        // This ensures that streaming responses with <think> tags are handled gracefully
+        
+        // If we have an opening <think> but no closing tag, add a temporary closing tag
+        if formattedContent.contains("<think>") && !formattedContent.contains("</think>") {
+            // Find the last <think> tag
+            if let lastThinkStart = formattedContent.range(of: "<think>", options: .backwards) {
+                let afterThinkStart = formattedContent[lastThinkStart.upperBound...]
+                // If there's content after <think> but no closing tag, add a temporary one
+                if !afterThinkStart.isEmpty {
+                    formattedContent += "</think>"
+                }
+            }
+        }
+        
+        return formattedContent
+    }
+    
     private init() {}
     
     func loadPersistedMessages() {
@@ -148,14 +170,15 @@ class AIChatMessageManager: ObservableObject {
                     }
                     
                     fullResponse += chunk
+                    let formattedResponse = formatStreamingContent(fullResponse)
                     await MainActor.run {
                         // Update the content directly on the ObservableObject
-                        aiMessage.content = fullResponse
+                        aiMessage.content = formattedResponse
                         // Also update the responses array
                         if aiMessage.responses.isEmpty {
-                            aiMessage.responses = [fullResponse]
+                            aiMessage.responses = [formattedResponse]
                         } else {
-                            aiMessage.responses[0] = fullResponse
+                            aiMessage.responses[0] = formattedResponse
                         }
                     }
                 }
@@ -235,14 +258,15 @@ class AIChatMessageManager: ObservableObject {
                     }
                     
                     fullResponse += chunk
+                    let formattedResponse = formatStreamingContent(fullResponse)
                     await MainActor.run {
                         // Update the content directly on the ObservableObject
-                        aiMessage.content = fullResponse
+                        aiMessage.content = formattedResponse
                         // Also update the responses array
                         if aiMessage.responses.isEmpty {
-                            aiMessage.responses = [fullResponse]
+                            aiMessage.responses = [formattedResponse]
                         } else {
-                            aiMessage.responses[0] = fullResponse
+                            aiMessage.responses[0] = formattedResponse
                         }
                     }
                 }
@@ -316,9 +340,10 @@ class AIChatMessageManager: ObservableObject {
                     }
                     
                     fullResponse += chunk
+                    let formattedResponse = formatStreamingContent(fullResponse)
                     await MainActor.run {
                         // Update the message content and add to responses
-                        message.addResponse(fullResponse)
+                        message.addResponse(formattedResponse)
                     }
                 }
                 

@@ -84,8 +84,8 @@ struct MessageBubble: View {
                         }
                     }
                     
-                    // Message content
-                    MarkdownRenderer(content: message.content, textColor: .white)
+                    // Message content with think block support
+                    ThinkBlockRenderer(content: message.content, textColor: .white)
                         .textSelection(.enabled)
                     
                     // Action buttons at the bottom - only show when response is complete
@@ -159,7 +159,7 @@ struct MessageBubble: View {
                 
                 // User's question (main message)
                 VStack(alignment: .trailing) {
-                    MarkdownRenderer(content: questionPart, textColor: .white)
+                    ThinkBlockRenderer(content: questionPart, textColor: .white)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -169,7 +169,7 @@ struct MessageBubble: View {
             } else {
                 // Fallback to regular display
                 VStack(alignment: .trailing) {
-                    MarkdownRenderer(content: message.content, textColor: .white)
+                    ThinkBlockRenderer(content: message.content, textColor: .white)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -180,7 +180,7 @@ struct MessageBubble: View {
         } else {
             // Regular message without selected text
             VStack(alignment: .trailing) {
-                MarkdownRenderer(content: message.content, textColor: .white)
+                ThinkBlockRenderer(content: message.content, textColor: .white)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
