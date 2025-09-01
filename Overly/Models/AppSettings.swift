@@ -38,6 +38,7 @@ class AppSettings: ObservableObject, @unchecked Sendable {
     private let toggleHotkeyKeyKey = "toggleHotkeyKey"
     private let toggleHotkeyModifiersKey = "toggleHotkeyModifiers"
     private let showInDockKey = "showInDock"
+    private let launchAtLoginKey = "launchAtLogin"
     private let windowFrameKey = "windowFrame"
     private let defaultProviderIdKey = "defaultProviderId"
     private let sidebarWidthKey = "sidebarWidth"
@@ -46,6 +47,7 @@ class AppSettings: ObservableObject, @unchecked Sendable {
     @Published var activeProviderIds: Set<String> = Set()
     @Published var faviconCache: [String: Data] = [:]
     @Published var showInDock: Bool = true
+    @Published var launchAtLogin: Bool = false
     @Published var toggleHotkeyKey: Key = .j
     @Published var toggleHotkeyModifiers: NSEvent.ModifierFlags = [.command]
     @Published var windowFrame: NSRect = NSRect(x: 0, y: 0, width: 500, height: 600)
@@ -107,6 +109,9 @@ class AppSettings: ObservableObject, @unchecked Sendable {
         // Load showInDock setting
         showInDock = userDefaults.object(forKey: showInDockKey) as? Bool ?? true
         
+        // Load launchAtLogin setting
+        launchAtLogin = userDefaults.object(forKey: launchAtLoginKey) as? Bool ?? false
+        
         // Load window frame
         if let frameData = userDefaults.data(forKey: windowFrameKey) {
             do {
@@ -155,6 +160,9 @@ class AppSettings: ObservableObject, @unchecked Sendable {
         
         // Save showInDock setting
         userDefaults.set(showInDock, forKey: showInDockKey)
+        
+        // Save launchAtLogin setting
+        userDefaults.set(launchAtLogin, forKey: launchAtLoginKey)
         
         // Save window frame
         let frameData = WindowFrameData(x: windowFrame.origin.x, y: windowFrame.origin.y, width: windowFrame.size.width, height: windowFrame.size.height)

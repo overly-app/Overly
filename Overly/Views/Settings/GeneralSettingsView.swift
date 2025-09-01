@@ -8,6 +8,7 @@
 import SwiftUI
 import AppKit
 import HotKey
+import ServiceManagement
 
 // Define a struct to decode the GitHub release JSON
 struct GitHubRelease: Decodable {
@@ -46,6 +47,12 @@ struct GeneralSettingsView: View {
                             NSApp.setActivationPolicy(.accessory)
                             NSApp.activate(ignoringOtherApps: true)
                         }
+                        settings.saveSettings()
+                    }
+                
+                Toggle("Launch at Login", isOn: $settings.launchAtLogin)
+                    .onChange(of: settings.launchAtLogin) { _, newValue in
+                        LaunchAtLoginManager.shared.setLaunchAtLogin(newValue)
                         settings.saveSettings()
                     }
             } header: {

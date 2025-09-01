@@ -40,11 +40,6 @@ struct SettingsWindowView: View {
                 }
                 .tag("Appearance")
                 
-                NavigationLink(value: "Shortcuts") {
-                    Label("Shortcuts", systemImage: "keyboard")
-                }
-                .tag("Shortcuts")
-                
                 NavigationLink(value: "About") {
                     Label("About", systemImage: "info.circle")
                 }
@@ -66,8 +61,6 @@ struct SettingsWindowView: View {
                     ModelManagementView()
                 case "Appearance":
                     AppearanceSettingsView()
-                case "Shortcuts":
-                    ShortcutsSettingsView()
                 case "About":
                     AboutSettingsView()
                 default:
