@@ -11,33 +11,43 @@ struct AIChatProviderView: View {
     @State private var inputText: String = ""
     @StateObject private var textSelectionManager = TextSelectionManager.shared
     @StateObject private var messageManager = AIChatMessageManager.shared
+    @StateObject private var chatSessionManager = ChatSessionManager.shared
     @State private var showModelPicker = false
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            AIChatHeaderView(
-                providerManager: AIProviderManager.shared,
-                showModelPicker: $showModelPicker,
-                onNewChat: messageManager.startNewChat
-            )
+        HStack(spacing: 0) {
+            // Chat sidebar
+            ChatSidebarView()
             
-            // Messages
-            messagesView
-            
-            // Input area
-            AIChatInputView(
-                inputText: $inputText,
-                isGenerating: $messageManager.isGenerating,
-                textSelectionManager: textSelectionManager,
-                onSendMessage: sendMessage,
-                onStopGeneration: messageManager.stopGeneration
-            )
+            // Main chat area
+            VStack(spacing: 0) {
+                // Header
+                AIChatHeaderView(
+                    providerManager: AIProviderManager.shared,
+                    showModelPicker: $showModelPicker,
+                    onNewChat: messageManager.startNewChat
+                )
+                
+                // Messages
+                messagesView
+                
+                // Input area
+                AIChatInputView(
+                    inputText: $inputText,
+                    isGenerating: $messageManager.isGenerating,
+                    textSelectionManager: textSelectionManager,
+                    onSendMessage: sendMessage,
+                    onStopGeneration: messageManager.stopGeneration
+                )
+            }
         }
         .background(Color(red: 0.11, green: 0.11, blue: 0.11))
         .onAppear {
             messageManager.loadPersistedMessages()
             setupNotificationObservers()
+        }
+        .onChange(of: chatSessionManager.currentSessionId) { _ in
+            messageManager.loadPersistedMessages()
         }
         .onDisappear {
             messageManager.saveMessagesToPersistence()

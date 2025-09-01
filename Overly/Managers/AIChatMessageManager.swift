@@ -17,6 +17,7 @@ class AIChatMessageManager: ObservableObject {
     
     private var currentTask: Task<Void, Never>?
     private let providerManager = AIProviderManager.shared
+    private let chatSessionManager = ChatSessionManager.shared
     
     // Helper function to parse and format streaming content with think blocks
     private func formatStreamingContent(_ content: String) -> String {
@@ -42,38 +43,31 @@ class AIChatMessageManager: ObservableObject {
     
     private init() {}
     
+    func switchToSession(_ sessionId: UUID) {
+        // Save current messages before switching
+        saveMessagesToPersistence()
+        
+        // Switch to new session
+        chatSessionManager.switchToChat(sessionId)
+        
+        // Load messages from new session
+        loadPersistedMessages()
+    }
+    
     func loadPersistedMessages() {
-        // Load messages from UserDefaults
-        if let data = UserDefaults.standard.data(forKey: "AIChatMessages"),
-           let decodedMessages = try? JSONDecoder().decode([PersistedMessage].self, from: data) {
-            messages = decodedMessages.map { persistedMessage in
-                let message = AIChatMessage(content: persistedMessage.content, isUser: persistedMessage.isUser)
-                if !persistedMessage.isUser && !persistedMessage.responses.isEmpty {
-                    message.responses = persistedMessage.responses
-                    message.currentResponseIndex = persistedMessage.currentResponseIndex
-                }
-                return message
-            }
+        // Load messages from current chat session
+        if let currentSession = chatSessionManager.getCurrentSession() {
+            messages = currentSession.messages
         } else {
-            // Default empty state - no initial messages
+            // No current session, start with empty messages
             messages = []
         }
     }
     
     func saveMessagesToPersistence() {
-        // Convert messages to persistable format
-        let persistedMessages = messages.map { message in
-            PersistedMessage(
-                content: message.content,
-                isUser: message.isUser,
-                responses: message.responses,
-                currentResponseIndex: message.currentResponseIndex
-            )
-        }
-        
-        // Save to UserDefaults
-        if let data = try? JSONEncoder().encode(persistedMessages) {
-            UserDefaults.standard.set(data, forKey: "AIChatMessages")
+        // Save messages to current chat session
+        chatSessionManager.updateCurrentSession { session in
+            session.messages = messages
         }
     }
     
@@ -81,11 +75,11 @@ class AIChatMessageManager: ObservableObject {
         // Stop any ongoing generation
         stopGeneration()
         
-        // Clear all messages
+        // Clear current messages
         messages.removeAll()
         
-        // Save the empty state
-        saveMessagesToPersistence()
+        // Create new chat session (this will set currentSessionId to nil)
+        chatSessionManager.createNewChat()
     }
     
     func stopGeneration() {
@@ -107,6 +101,9 @@ class AIChatMessageManager: ObservableObject {
         let userMessage = AIChatMessage(content: userMessageContent, isUser: true)
         messages.append(userMessage)
         
+        // Add message to current session
+        chatSessionManager.addMessageToCurrentSession(userMessage)
+        
         let messageToSend = inputText
         
         // Check if model is selected
@@ -115,6 +112,9 @@ class AIChatMessageManager: ObservableObject {
             messages.append(errorMessage)
             return
         }
+        
+        // Update the model in current session
+        chatSessionManager.updateCurrentSessionModel(providerManager.selectedModel)
         
         // Show typing indicator and set generating state
         isTyping = true
@@ -160,6 +160,8 @@ class AIChatMessageManager: ObservableObject {
                 aiMessage.startGenerating() // Mark as generating
                 await MainActor.run {
                     messages.append(aiMessage)
+                    // Add AI message to current session
+                    chatSessionManager.addMessageToCurrentSession(aiMessage)
                 }
                 
                 var fullResponse = ""

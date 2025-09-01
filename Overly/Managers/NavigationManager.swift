@@ -36,7 +36,7 @@ class NavigationManager: ObservableObject {
     private func performWindowOperations(url: URL, isDockless: Bool) {
         // Ensure the main window is visible - always show it, don't toggle
         if customWindow == nil {
-            print("CustomWindow is nil, creating new window")
+            print("CustomWindow is nil, creating new window") 
             // Window should be created by WindowManager
             return
         } else if !customWindow!.isVisible {
