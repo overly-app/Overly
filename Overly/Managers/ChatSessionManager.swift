@@ -59,7 +59,12 @@ class ChatSessionManager: ObservableObject {
     func generateTitleForCurrentSession() async {
         guard let session = getCurrentSession(),
               !session.messages.isEmpty,
-              (session.title == "New Chat" || session.title == "Untitled") else { return }
+              (session.title == "New Chat" || session.title == "Untitled") else { 
+            print("Title generation guard failed: session not found or conditions not met")
+            return 
+        }
+        
+        print("Starting title generation for session: \(session.id), title: \(session.title)")
         
         await MainActor.run {
             isGeneratingTitle = true
@@ -67,11 +72,13 @@ class ChatSessionManager: ObservableObject {
         
         do {
             let title = try await generateTitleFromMessages(session.messages)
+            print("Generated title: '\(title)' for session: \(session.id)")
             
             await MainActor.run {
                 updateCurrentSession { session in
                     session.updateTitle(title)
                 }
+                print("Updated session title to: '\(title)'")
                 isGeneratingTitle = false
             }
         } catch {
@@ -98,35 +105,51 @@ class ChatSessionManager: ObservableObject {
         - Maximum 80 characters
         - Professional and clear
         - No quotes or special formatting
+        - just return the title, no other text
+        - title case, no punctuation
         
         Title:
         """
         
         let ollamaMessage = OllamaChatMessage(role: "user", content: prompt)
+        print("Sending title generation request to Ollama with prompt: \(prompt)")
+        
         let stream = try await ollamaManager.sendChatMessage(messages: [ollamaMessage])
         
         var title = ""
         for try await chunk in stream {
             title += chunk
-            if title.count >= 80 {
-                break
-            }
+            print("Received title chunk: '\(chunk)'")
+            // Don't break at 80 chars - let it complete to get the full title
         }
+        
+        print("Final title before cleanup: '\(title)'")
         
         // Clean up the title
         title = title.trimmingCharacters(in: .whitespacesAndNewlines)
         
         // Remove <think> blocks and everything in between if they exist
+        print("Title before <think> removal: '\(title)'")
+        
         if title.contains("<think>") {
-            let components = title.components(separatedBy: "<think>")
-            if components.count > 1 {
-                // Take only the part before the first <think> tag
-                title = components[0]
+            if let startRange = title.range(of: "<think>") {
+                if let endRange = title.range(of: "</think>") {
+                    // Remove everything from <think> to </think> inclusive
+                    let beforeThink = String(title[..<startRange.lowerBound])
+                    let afterThink = String(title[endRange.upperBound...])
+                    title = beforeThink + afterThink
+                    print("Removed <think> block: before='\(beforeThink)', after='\(afterThink)'")
+                } else {
+                    // No closing tag found, remove everything from <think> onwards
+                    title = String(title[..<startRange.lowerBound])
+                    print("No closing </think> tag found, removed from <think> onwards")
+                }
             }
         }
         
         // Also remove any remaining </think> tags
         title = title.replacingOccurrences(of: "</think>", with: "")
+        print("Title after <think> removal: '\(title)'")
         
         title = title.replacingOccurrences(of: "\n", with: " ")
         title = title.replacingOccurrences(of: "\"", with: "")
@@ -154,12 +177,15 @@ class ChatSessionManager: ObservableObject {
         // Check if this will be the first user message before adding it
         let shouldGenerateTitle = message.isUser && getCurrentSession()?.messages.count == 0
         
+        print("Adding message: isUser=\(message.isUser), messageCount=\(getCurrentSession()?.messages.count ?? 0), shouldGenerateTitle=\(shouldGenerateTitle)")
+        
         updateCurrentSession { session in
             session.addMessage(message)
         }
         
         // Generate title if this was the first user message
         if shouldGenerateTitle {
+            print("Triggering title generation for first user message")
             Task {
                 await generateTitleForCurrentSession()
             }
