@@ -22,10 +22,6 @@ struct ProviderSettingsView: View {
                  
                  VStack(alignment: .leading, spacing: 12) {
                      HStack {
-                         Image(systemName: "star.fill")
-                             .foregroundColor(.yellow)
-                             .font(.system(size: 16))
-                         
                          Text("Choose which provider loads when the app starts:")
                              .font(.system(size: 14))
                      }
@@ -58,7 +54,7 @@ struct ProviderSettingsView: View {
                  }
                  .padding(.horizontal, 16)
                  .padding(.vertical, 12)
-                 .frame(maxWidth: .infinity, alignment: .leading)
+                 .frame(alignment: .leading)
                  .background(Color(NSColor.controlBackgroundColor))
                  .cornerRadius(8)
                  .overlay(
