@@ -9,12 +9,13 @@ import AppKit
 import HotKey
 
 class HotkeyManager: ObservableObject {
+    static let shared = HotkeyManager()
+    
     private var toggleHotKey: HotKey?
     private var reloadHotKey: HotKey?
     private var nextServiceHotKey: HotKey?
     private var settingsHotKey: HotKey?
     private var commandPaletteHotKey: HotKey?
-    private var toggleSidebarHotKey: HotKey?
     private var isHotkeyDisabled = false
     
     // Closures for actions
@@ -23,7 +24,6 @@ class HotkeyManager: ObservableObject {
     var switchToNextServiceAction: (() -> Void)?
     var hideWindowAction: (() -> Void)?
     var showCommandPaletteAction: (() -> Void)?
-    var toggleSidebarAction: (() -> Void)?
     
     init() {
         setupInitialHotkeys()
@@ -128,19 +128,13 @@ class HotkeyManager: ObservableObject {
             self?.switchToNextServiceAction?()
         }
         
-        // Create the context hotkey for Cmd + E (toggle sidebar)
-        toggleSidebarHotKey = HotKey(key: .e, modifiers: [.command])
-        toggleSidebarHotKey?.keyDownHandler = { [weak self] in
-            Task { @MainActor in
-                self?.toggleSidebarAction?()
-            }
-        }
+        // Cmd+E sidebar hotkey removed - functionality was never implemented
     }
     
     func disableContextHotkeys() {
         reloadHotKey = nil
         nextServiceHotKey = nil
-        toggleSidebarHotKey = nil
+        // toggleSidebarHotKey removed
     }
     
     deinit {

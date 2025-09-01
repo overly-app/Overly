@@ -12,7 +12,7 @@ class BorderlessWindow: NSWindow {
     // Closures to hold actions from ContentView
     var reloadAction: (() -> Void)?
     var nextServiceAction: (() -> Void)?
-    var toggleSidebarAction: (() -> Void)?
+    // toggleSidebarAction removed - sidebar functionality was never implemented
 
     override init(
         contentRect: NSRect,

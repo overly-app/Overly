@@ -111,9 +111,7 @@ class WindowManager: NSObject, ObservableObject {
             self?.customWindow?.nextServiceAction?()
         }
         
-        hotkeyManager.toggleSidebarAction = { [weak self] in
-            self?.customWindow?.toggleSidebarAction?()
-        }
+        // toggleSidebarAction removed - sidebar functionality was never implemented
     }
     
     private func setupNotificationObservers() {
