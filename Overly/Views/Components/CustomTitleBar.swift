@@ -37,7 +37,7 @@ struct CustomTitleBar: View {
             //     }
             //     .buttonStyle(.plain)
             //     .help("Web Mode")
-                
+            //         
             //     Button(action: { useNativeChat = true }) {
             //         Image(systemName: "brain")
             //             .font(.system(size: 14, weight: .medium))
@@ -113,23 +113,9 @@ struct CustomTitleBar: View {
         .padding(.horizontal)
         .frame(height: 30)
         .background(.thinMaterial)
-        .gesture(
-            // Combine drag and double-tap gestures
-            DragGesture()
-                .onChanged { value in
-                    // Move the window during drag
-                    guard let window = window else { return }
-                    let currentLocation = NSEvent.mouseLocation
-                    let newOrigin = NSPoint(
-                        x: currentLocation.x - value.location.x,
-                        y: currentLocation.y - (window.frame.height - value.location.y)
-                    )
-                    window.setFrameOrigin(newOrigin)
-                }
-                .exclusively(before: TapGesture(count: 2).onEnded({
-                    handleDoubleClick()
-                }))
-        )
+        .onTapGesture(count: 2) {
+            handleDoubleClick()
+        }
     }
     
     private func startCloseDropdownDelay() {

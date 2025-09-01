@@ -21,7 +21,7 @@ class BorderlessWindow: NSWindow {
         defer flag: Bool
     ) {
         // Add .resizable back to the style mask
-        let modifiedStyleMask: NSWindow.StyleMask = [.borderless, .resizable]
+        let modifiedStyleMask: NSWindow.StyleMask = [.borderless, .resizable, .fullSizeContentView]
         super.init(contentRect: contentRect, styleMask: modifiedStyleMask, backing: backing, defer: flag)
 
         // Configure the window for a custom shape and no title bar
@@ -29,7 +29,7 @@ class BorderlessWindow: NSWindow {
         self.titleVisibility = .hidden
         self.isOpaque = false
         self.backgroundColor = .clear
-        self.isMovableByWindowBackground = false // Disable window dragging by background
+        self.isMovableByWindowBackground = true // Enable window dragging by background
         self.hasShadow = false // Ensure no native shadow
 
         // Set window level to floating so it stays above other windows
