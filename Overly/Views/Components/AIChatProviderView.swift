@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct AIChatProviderView: View {
     @State private var inputText: String = ""
@@ -14,6 +15,8 @@ struct AIChatProviderView: View {
     @StateObject private var messageManager = AIChatMessageManager.shared
     @StateObject private var chatSessionManager = ChatSessionManager.shared
     @State private var showModelPicker = false
+    @State private var editorHeight: CGFloat = 44
+    private let editorFont = NSFont.systemFont(ofSize: 16)
     
     var body: some View {
         HStack(spacing: 0) {
@@ -93,19 +96,32 @@ struct AIChatProviderView: View {
             
             // Centered input box
             VStack(spacing: 16) {
-                HStack(spacing: 0) {
-                    // Controls: plus, attachment, model picker
-                    HStack(spacing: 10) {
-                        Button(action: {}) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white)
-                                .frame(width: 28, height: 28)
-                                .background(Color(red: 0.2, green: 0.2, blue: 0.2))
-                                .cornerRadius(6)
+                // Big panel with multiline TextEditor (no inner background/border)
+                VStack(spacing: 0) {
+                    ZStack(alignment: .topLeading) {
+                        TextEditor(text: $inputText)
+                            .font(.system(size: 16))
+                            .foregroundColor(.white)
+                            .scrollContentBackground(.hidden)
+                            .background(Color.clear)
+                            .frame(height: editorHeight)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 16)
+                            .padding(.bottom, 8)
+                            .onChange(of: inputText) { _ in
+                                updateEditorHeight()
+                            }
+                        
+                        if inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text("How can I help you today?")
+                                .font(.system(size: 16))
+                                .foregroundColor(.gray)
+                                .padding(.horizontal, 26)
+                                .padding(.top, 20)
                         }
-                        .buttonStyle(.plain)
-
+                    }
+                    
+                    HStack(spacing: 12) {
                         Button(action: {}) {
                             Image(systemName: "paperclip")
                                 .font(.system(size: 14, weight: .medium))
@@ -115,7 +131,7 @@ struct AIChatProviderView: View {
                                 .cornerRadius(6)
                         }
                         .buttonStyle(.plain)
-
+                        
                         Button(action: { showModelPicker.toggle() }) {
                             HStack(spacing: 6) {
                                 Image(systemName: "brain")
@@ -139,44 +155,31 @@ struct AIChatProviderView: View {
                             ModelPickerView()
                                 .frame(width: 360, height: 420)
                         }
-                    }
-                    .padding(.leading, 12)
-
-                    Divider()
-                        .frame(height: 26)
-                        .background(Color(red: 0.22, green: 0.22, blue: 0.22))
-                        .padding(.horizontal, 12)
-
-                    TextField("Type your message here...", text: $inputText)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .font(.system(size: 16))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 16)
-                        .onSubmit {
+                        
+                        Spacer()
+                        
+                        Button(action: {
                             if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 showPromptSuggestions = false
                                 sendMessage()
                             }
+                        }) {
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white)
+                                .frame(width: 32, height: 32)
+                                .background(Color.accentColor)
+                                .cornerRadius(8)
                         }
-                    
-                    Button(action: {
-                        if !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            showPromptSuggestions = false
-                            sendMessage()
-                        }
-                    }) {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(.accentColor)
-                            .padding(.trailing, 16)
+                        .buttonStyle(.plain)
+                        .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 14)
                 }
+                .frame(width: 600)
                 .background(Color(red: 0.15, green: 0.15, blue: 0.15))
                 .cornerRadius(12)
-                .frame(width: 600)
             }
             
             Spacer()
@@ -236,6 +239,21 @@ struct AIChatProviderView: View {
         
         // Hide prompt suggestions when a message is sent
         showPromptSuggestions = false
+        editorHeight = 44
+    }
+
+    private func updateEditorHeight() {
+        let text = inputText + "\n" // ensure at least one line height
+        let attributes: [NSAttributedString.Key: Any] = [.font: editorFont]
+        let bounding = (text as NSString).boundingRect(
+            with: CGSize(width: 560, height: CGFloat.greatestFiniteMagnitude), // panel width minus horizontal padding
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attributes
+        )
+        let minH: CGFloat = 44
+        let maxH: CGFloat = 240
+        let computed = ceil(bounding.height) + 24 // top/bottom padding inside editor
+        editorHeight = max(minH, min(computed, maxH))
     }
     
     private func setupNotificationObservers() {
