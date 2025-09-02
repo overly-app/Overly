@@ -94,6 +94,59 @@ struct AIChatProviderView: View {
             // Centered input box
             VStack(spacing: 16) {
                 HStack(spacing: 0) {
+                    // Controls: plus, attachment, model picker
+                    HStack(spacing: 10) {
+                        Button(action: {}) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white)
+                                .frame(width: 28, height: 28)
+                                .background(Color(red: 0.2, green: 0.2, blue: 0.2))
+                                .cornerRadius(6)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: {}) {
+                            Image(systemName: "paperclip")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white)
+                                .frame(width: 28, height: 28)
+                                .background(Color(red: 0.2, green: 0.2, blue: 0.2))
+                                .cornerRadius(6)
+                        }
+                        .buttonStyle(.plain)
+
+                        Button(action: { showModelPicker.toggle() }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "brain")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.gray)
+                                Text(AIProviderManager.shared.selectedModel.isEmpty ? "Select Model" : AIProviderManager.shared.selectedModel.replacingOccurrences(of: ":latest", with: ""))
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(Color(red: 0.2, green: 0.2, blue: 0.2))
+                            .cornerRadius(6)
+                        }
+                        .buttonStyle(.plain)
+                        .popover(isPresented: $showModelPicker) {
+                            ModelPickerView()
+                                .frame(width: 360, height: 420)
+                        }
+                    }
+                    .padding(.leading, 12)
+
+                    Divider()
+                        .frame(height: 26)
+                        .background(Color(red: 0.22, green: 0.22, blue: 0.22))
+                        .padding(.horizontal, 12)
+
                     TextField("Type your message here...", text: $inputText)
                         .textFieldStyle(PlainTextFieldStyle())
                         .font(.system(size: 16))
@@ -123,7 +176,7 @@ struct AIChatProviderView: View {
                 }
                 .background(Color(red: 0.15, green: 0.15, blue: 0.15))
                 .cornerRadius(12)
-                .frame(width: 400)
+                .frame(width: 600)
             }
             
             Spacer()
